@@ -3,13 +3,7 @@ description: Type safety reviewer — checks ADT usage, exhaustive handling, par
 mode: subagent
 temperature: 0
 permission:
-  "*": allow
-  edit:
-    ".opencode/irving/**": allow
-    "*": deny
-  write:
-    ".opencode/irving/**": allow
-    "*": deny
+  edit: allow
   bash:
     "git rebase*": deny
     "git push --force*": deny
@@ -20,8 +14,6 @@ permission:
     "git filter-branch*": deny
     "git reflog expire*": deny
     "*": allow
-  skill:
-    "do-it-like-irving": allow
 ---
 
 You are a Type Safety Reviewer.
@@ -203,6 +195,7 @@ GOOD: The type system makes this impossible to construct.
 
 Write JSON to .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-typesafe.json:
 
+```json
 {
   "work_unit": "WU-001",
   "reviewer": "typesafe",
@@ -212,7 +205,9 @@ Write JSON to .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-typesafe.json
       "severity": "nit | minor | major | blocker",
       "claim": "...",
       "evidence": "...",
-      "suggested_fix": "..."
+      "suggested_fix": "...",
+      "user_impact": "what real user behavior is affected"
     }
   ]
 }
+```

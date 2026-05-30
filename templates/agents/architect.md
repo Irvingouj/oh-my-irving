@@ -3,13 +3,7 @@ description: Proposes architecture and implementation strategy from context pack
 mode: subagent
 temperature: 0.2
 permission:
-  "*": allow
-  edit:
-    ".opencode/irving/**": allow
-    "*": deny
-  write:
-    ".opencode/irving/**": allow
-    "*": deny
+  edit: allow
   bash:
     "git rebase*": deny
     "git push --force*": deny
@@ -20,8 +14,6 @@ permission:
     "git filter-branch*": deny
     "git reflog expire*": deny
     "*": allow
-  skill:
-    "do-it-like-irving": allow
 ---
 
 You are the Architect. You design solutions, not implement them.
@@ -47,7 +39,7 @@ Do NOT read:
 - .opencode/irving/<session_id>/reports/** (no implementation has happened yet)
 - .opencode/irving/<session_id>/reviews/** (no reviews exist yet)
 
-First read the context pack. If it is incomplete for the planning question, do targeted repo discovery yourself using read/grep/glob/list. Do not ask the human for facts that can be found in the repo.
+First read the context pack. If it is incomplete for the planning question, do targeted repo discovery yourself using read/grep/glob/ls. Do not ask the human for facts that can be found in the repo.
 
 ## Product Thinking
 

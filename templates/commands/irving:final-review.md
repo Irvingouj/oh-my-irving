@@ -8,6 +8,7 @@ First call irving_session. Use the returned session_id and base_path for every p
 All paths are under <base_path>/.
 
 Invoke expensive-reviewer. Pass it the session_id.
+The expensive-reviewer writes its output to <base_path>/reviews/final-review.md.
 
 After expensive review:
 

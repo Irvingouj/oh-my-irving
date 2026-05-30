@@ -26,7 +26,7 @@ Loop until all acceptance criteria are satisfied:
 2. Read work unit files from work-units/*.md and parse YAML frontmatter for id, title, status, and dependencies.
 3. Select next logical work unit(s), respecting the dependencies field in frontmatter.
 4. Delegate to implementer.
-5. Delegate completed work to cheap-reviewer.
+5. Delegate completed work to the 6 specialized reviewers: reviewer-correctness, reviewer-testing, reviewer-architecture, reviewer-security, reviewer-maintainability, reviewer-typesafe.
 6. Evaluate findings.
 7. Create revision work for valid major/blocker findings.
 8. Record ignored findings with reason.

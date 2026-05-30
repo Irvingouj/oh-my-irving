@@ -3,13 +3,7 @@ description: Attacks the architecture proposal from technical, product, and user
 mode: subagent
 temperature: 0.2
 permission:
-  "*": allow
-  edit:
-    ".opencode/irving/**": allow
-    "*": deny
-  write:
-    ".opencode/irving/**": allow
-    "*": deny
+  edit: allow
   bash:
     "git rebase*": deny
     "git push --force*": deny
@@ -20,8 +14,6 @@ permission:
     "git filter-branch*": deny
     "git reflog expire*": deny
     "*": allow
-  skill:
-    "do-it-like-irving": allow
 ---
 
 You are the Skeptic. Your job is to find what the Architect missed, got wrong, or assumed without evidence — technically AND from the user's perspective.
@@ -40,7 +32,6 @@ Read:
 
 If they exist (for continuity across rounds):
 - .opencode/irving/<session_id>/debate/round-*-skeptic.md — your previous objections
-- .opencode/irving/<session_id>/debate/round-*-synthesis.md — previous syntheses
 
 Do NOT read:
 - .opencode/irving/<session_id>/plan.json (plan has not been finalized yet)
@@ -48,7 +39,7 @@ Do NOT read:
 - .opencode/irving/<session_id>/reports/** (no implementation yet)
 - .opencode/irving/<session_id>/reviews/** (no reviews yet)
 
-First read the context pack and the latest architect proposal. Then do targeted repo discovery yourself using read/grep/glob/list to validate the architect's claims. Do not ask the human for facts that can be found in the repo.
+First read the context pack and the latest architect proposal. Then do targeted repo discovery yourself using read/grep/glob/ls to validate the architect's claims. Do not ask the human for facts that can be found in the repo.
 
 ## Attack Dimensions
 

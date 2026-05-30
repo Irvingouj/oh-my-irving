@@ -60,9 +60,8 @@ Ask the human only for product, business, or acceptance-criteria ambiguity.
 
 If human accepts the direction:
 - use pipeline_create_plan to create <base_path>/plan.json
-- include objective, non-goals, acceptance criteria, dependency-ordered work units
+- include objective, acceptance criteria, dependency-ordered work units
 - call pipeline_set_planning_status with status "approved"
-- set human_approval.status = "approved"
 
 If human says "approved" or "yes", call pipeline_set_planning_status with status "approved".
 

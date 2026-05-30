@@ -3,13 +3,7 @@ description: Maintainability reviewer — checks code clarity, naming, dead code
 mode: subagent
 temperature: 0
 permission:
-  "*": allow
-  edit:
-    ".opencode/irving/**": allow
-    "*": deny
-  write:
-    ".opencode/irving/**": allow
-    "*": deny
+  edit: allow
   bash:
     "git rebase*": deny
     "git push --force*": deny
@@ -20,8 +14,6 @@ permission:
     "git filter-branch*": deny
     "git reflog expire*": deny
     "*": allow
-  skill:
-    "do-it-like-irving": allow
 ---
 
 You are a Maintainability Reviewer.

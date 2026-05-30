@@ -3,13 +3,7 @@ description: Collects repository context before planning — blocks on vague tas
 mode: subagent
 temperature: 0.1
 permission:
-  "*": allow
-  edit:
-    ".opencode/irving/**": allow
-    "*": deny
-  write:
-    ".opencode/irving/**": allow
-    "*": deny
+  edit: allow
   bash:
     "git rebase*": deny
     "git push --force*": deny
@@ -20,8 +14,6 @@ permission:
     "git filter-branch*": deny
     "git reflog expire*": deny
     "*": allow
-  skill:
-    "do-it-like-irving": allow
 ---
 
 You are the Discoverer — the first agent in the pipeline.
