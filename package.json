@@ -1,0 +1,39 @@
+{
+  "name": "oh-my-irving",
+  "version": "0.1.0",
+  "description": "Multi-agent orchestration plugin for OpenCode — LLM orchestrator with pipeline tools, guard rails, and external loop",
+  "type": "module",
+  "main": "./dist/index.js",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "files": [
+    "dist",
+    "templates",
+    "bin"
+  ],
+  "bin": {
+    "oh-my-irving": "./bin/oh-my-irving.mjs"
+  },
+  "scripts": {
+    "build": "tsc && esbuild src/index.ts --bundle --platform=node --format=esm --external:@opencode-ai/plugin --outfile=dist/oh-my-irving.plugin.js",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "opencode",
+    "opencode-plugin",
+    "agent",
+    "orchestration",
+    "pipeline"
+  ],
+  "license": "MIT",
+  "peerDependencies": {
+    "@opencode-ai/plugin": ">=0.15.0"
+  },
+  "devDependencies": {
+    "@opencode-ai/plugin": "latest",
+    "@types/node": "^25.9.1",
+    "esbuild": "^0.28.0",
+    "typescript": "latest"
+  }
+}

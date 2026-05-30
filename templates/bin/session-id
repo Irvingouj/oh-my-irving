@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+set -eu
+
+session_id="${IRVING_SESSION_ID:-${OPENCODE_SESSION_ID:-}}"
+
+if [ -z "$session_id" ]; then
+  echo "MISSING_IRVING_SESSION_ID"
+  exit 1
+fi
+
+printf "%s" "$session_id"
