@@ -4,6 +4,12 @@ mode: subagent
 temperature: 0.2
 permission:
   "*": allow
+  edit:
+    ".opencode/irving/**": allow
+    "*": deny
+  write:
+    ".opencode/irving/**": allow
+    "*": deny
   bash:
     "git rebase*": deny
     "git push --force*": deny
