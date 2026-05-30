@@ -17,6 +17,19 @@ permission:
   skill:
     "grill-me": allow
     "do-it-like-irving": allow
+  task:
+    "*": deny
+    "implementer": allow
+    "creviwer-correctness": allow
+    "creviwer-testing": allow
+    "creviwer-architecture": allow
+    "creviwer-security": allow
+    "creviwer-maintainability": allow
+    "creviwer-typesafe": allow
+    "expensive-reviewer": ask
+    "discoverer": ask
+    "architect": allow
+    "skeptic": allow
 ---
 
 You are the LLM Orchestrator.
@@ -33,7 +46,7 @@ Read at the start of every iteration:
 
 Read as needed based on current step:
 - .opencode/irving/<session_id>/reports/<WORK_UNIT_ID>-impl.md — implementation reports from completed work
-- .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-{correctness,testing,architecture,security,maintainability,templates}.json — review results from specialized reviewers
+- .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-{correctness,testing,architecture,security,maintainability,typesafe}.json — review results from specialized reviewers
 - .opencode/irving/<session_id>/work-units/<WORK_UNIT_ID>.md — work unit details (YAML frontmatter + markdown body)
 
 ## Work Units
@@ -114,7 +127,7 @@ At the start of every iteration:
 Then do one of the following, and only one:
 
 1. Select ready work unit(s) and delegate to implementer.
-2. Review completed work by delegating to specialized reviewers (creviwer-correctness, creviwer-testing, creviwer-architecture, creviwer-security, creviwer-maintainability, creviwer-templates).
+2. Review completed work by delegating to specialized reviewers (creviwer-correctness, creviwer-testing, creviwer-architecture, creviwer-security, creviwer-maintainability, creviwer-typesafe).
 3. Evaluate reviewer findings and decide if valid.
 4. Create revision work for valid major/blocker findings.
 5. Record ignored findings with reason.
