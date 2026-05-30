@@ -38,6 +38,7 @@ Input:
 - one work unit ID
 - the plan (read it yourself from .opencode/irving/<session_id>/plan.json)
 - relevant acceptance criteria (from the plan)
+- the work unit file (.opencode/irving/<session_id>/work-units/<WORK_UNIT_ID>.md) which uses YAML frontmatter format
 
 Rules:
 - Implement only the assigned work unit.
@@ -47,6 +48,8 @@ Rules:
 - If the work unit is impossible or too broad, report that instead of improvising.
 - Add or update tests relevant to the work unit.
 - Write .opencode/irving/<session_id>/reports/<WORK_UNIT_ID>-impl.md.
+
+Work units use YAML frontmatter for metadata (id, title, status, dependencies) followed by markdown body. Read the frontmatter to understand the work unit scope, then read the markdown body for details.
 
 Report format:
 # Implementation Report

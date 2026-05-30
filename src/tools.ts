@@ -1,180 +1,26 @@
-import { mkdir, readFile, writeFile, appendFile } from "node:fs/promises";
+import { readFile, writeFile, appendFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import { tool, type ToolContext, type ToolDefinition } from "@opencode-ai/plugin";
-
-type Phase = "init" | "discovery" | "planning" | "execution" | "final_review" | "accepted" | "blocked";
-
-type NextAction = "continue" | "needs_human" | "ready_for_final_review" | "accepted" | "blocked" | "failed";
-
-type State = {
-  version: 1;
-  session_id: string;
-  phase: Phase;
-  planning: {
-    status: string;
-    round: number;
-  };
-  execution: {
-    status: string;
-    iteration: number;
-    next_action: NextAction;
-    reason: string;
-    blocking_question: string | null;
-    last_error: string | null;
-    active_work_units: string[];
-    blocked_work_units: string[];
-    ignored_findings: Array<{
-      finding_id: string;
-      reason: string;
-    }>;
-    evidence: Array<{
-      ac_id: string;
-      type: "test" | "review" | "manual" | "static";
-      detail: string;
-    }>;
-  };
-};
-
-type SessionAnchor = {
-  version: 1;
-  root_session_id: string;
-  child_session_ids: string[];
-  created_at: string;
-  updated_at: string;
-  session_id?: string;
-};
-
-function irvingBaseDir(root: string) {
-  return path.join(root, ".opencode", "irving");
-}
-
-function sessionDir(root: string, sessionId: string) {
-  return path.join(irvingBaseDir(root), sessionId);
-}
-
-function sessionAnchorPath(root: string) {
-  return path.join(irvingBaseDir(root), ".active-session.json");
-}
-
-function statePath(root: string, sessionId: string) {
-  return path.join(sessionDir(root, sessionId), "state.json");
-}
-
-async function ensureDirs(root: string, sessionId: string) {
-  const base = sessionDir(root, sessionId);
-  for (const dir of [
-    base,
-    path.join(base, "debate"),
-    path.join(base, "work-units"),
-    path.join(base, "reports"),
-    path.join(base, "reviews"),
-    path.join(base, "logs"),
-  ]) {
-    await mkdir(dir, { recursive: true });
-  }
-}
-
-async function readStateFile(root: string, sessionId: string): Promise<State> {
-  await ensureDirs(root, sessionId);
-  const file = statePath(root, sessionId);
-  if (!existsSync(file)) {
-    return {
-      version: 1,
-      session_id: sessionId,
-      phase: "init",
-      planning: { status: "not_started", round: 0 },
-      execution: {
-        status: "not_started",
-        iteration: 0,
-        next_action: "continue",
-        reason: "",
-        blocking_question: null,
-        last_error: null,
-        active_work_units: [],
-        blocked_work_units: [],
-        ignored_findings: [],
-        evidence: [],
-      },
-    };
-  }
-  return JSON.parse(await readFile(file, "utf8")) as State;
-}
-
-async function writeStateFile(root: string, sessionId: string, state: State) {
-  await ensureDirs(root, sessionId);
-  await writeFile(statePath(root, sessionId), JSON.stringify(state, null, 2) + "\n", "utf8");
-}
-
-async function logEvent(root: string, sessionId: string, event: Record<string, unknown>) {
-  await ensureDirs(root, sessionId);
-  await appendFile(
-    path.join(sessionDir(root, sessionId), "logs", "events.jsonl"),
-    JSON.stringify({ at: new Date().toISOString(), ...event }) + "\n",
-    "utf8",
-  );
-}
+import {
+  currentSessionId,
+  ensureDirs,
+  sessionDir,
+  debateDir,
+  workUnitsDir,
+  planPath,
+} from "./session.js";
+import {
+  readStateFile,
+  writeStateFile,
+  readPlanFile,
+  writePlanFile,
+  logEvent,
+} from "./state.js";
+import { validateState, validatePlan } from "./schema.js";
 
 function sessionIdArg() {
   return tool.schema.string().optional().describe("Session ID. Defaults to the current OpenCode session.");
-}
-
-async function currentSessionId(root: string, context: ToolContext, requestedSessionId?: string | null): Promise<string> {
-  const contextSessionId = context.sessionID;
-  if (!contextSessionId) {
-    throw new Error("OpenCode TUI did not provide context.sessionID.");
-  }
-
-  const base = irvingBaseDir(root);
-  await mkdir(base, { recursive: true });
-
-  const file = sessionAnchorPath(root);
-  const now = new Date().toISOString();
-  if (!existsSync(file)) {
-    const rootSessionId = requestedSessionId || contextSessionId;
-    const anchor: SessionAnchor = {
-      version: 1,
-      root_session_id: rootSessionId,
-      child_session_ids: contextSessionId === rootSessionId ? [] : [contextSessionId],
-      created_at: now,
-      updated_at: now,
-    };
-    await writeFile(file, JSON.stringify(anchor, null, 2) + "\n", "utf8");
-    return rootSessionId;
-  }
-
-  const anchor = JSON.parse(await readFile(file, "utf8")) as SessionAnchor;
-  const rootSessionId = anchor.root_session_id || anchor.session_id;
-  if (!rootSessionId) {
-    throw new Error(`Invalid Irving session anchor at ${file}: missing root_session_id.`);
-  }
-  if (requestedSessionId && requestedSessionId !== rootSessionId) {
-    throw new Error(
-      `Irving session mismatch. Expected root session ${rootSessionId}, got requested session ${requestedSessionId}.`,
-    );
-  }
-
-  const childSessionIds = anchor.child_session_ids ?? [];
-  if (contextSessionId !== rootSessionId && !childSessionIds.includes(contextSessionId)) {
-    childSessionIds.push(contextSessionId);
-  }
-
-  await writeFile(
-    file,
-    JSON.stringify(
-      {
-        version: 1,
-        root_session_id: rootSessionId,
-        child_session_ids: childSessionIds,
-        created_at: anchor.created_at ?? now,
-        updated_at: now,
-      },
-      null,
-      2,
-    ) + "\n",
-    "utf8",
-  );
-  return rootSessionId;
 }
 
 async function resolveSessionId(root: string, args: { session_id?: string | null }, context: ToolContext): Promise<string> {
@@ -204,6 +50,7 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
       async execute(_args, context) {
         const sessionId = await currentSessionId(worktree, context);
         const state = await readStateFile(worktree, sessionId);
+        validateState(state);
         await writeStateFile(worktree, sessionId, state);
         await logEvent(worktree, sessionId, { type: "pipeline.init" });
         return `Session ${sessionId} initialized. Path: .opencode/irving/${sessionId}/`;
@@ -348,11 +195,11 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
       },
       async execute(args, context) {
         const sessionId = await resolveSessionId(worktree, args, context);
-        await ensureDirs(worktree, sessionId);
-        const file = path.join(sessionDir(worktree, sessionId), "plan.json");
-        await writeFile(file, args.plan, "utf8");
+        const plan = JSON.parse(args.plan);
+        validatePlan(plan);
+        await writePlanFile(worktree, sessionId, plan);
         await logEvent(worktree, sessionId, { type: "pipeline.plan_created" });
-        return `Wrote ${file}`;
+        return `Wrote ${planPath(worktree, sessionId)}`;
       },
     }),
 
@@ -364,11 +211,13 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
       async execute(args, context) {
         const sessionId = await resolveSessionId(worktree, args, context);
         await ensureDirs(worktree, sessionId);
-        const file = path.join(sessionDir(worktree, sessionId), "plan.json");
+        const file = planPath(worktree, sessionId);
         if (!existsSync(file)) {
           return "plan.json does not exist yet";
         }
-        return await readFile(file, "utf8");
+        const plan = await readPlanFile(worktree, sessionId);
+        validatePlan(plan);
+        return JSON.stringify(plan, null, 2);
       },
     }),
 
@@ -382,7 +231,7 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
       async execute(args, context) {
         const sessionId = await resolveSessionId(worktree, args, context);
         await ensureDirs(worktree, sessionId);
-        const file = path.join(sessionDir(worktree, sessionId), "work-units", `${args.id}.md`);
+        const file = path.join(workUnitsDir(worktree, sessionId), `${args.id}.md`);
         await writeFile(file, args.content, "utf8");
         await logEvent(worktree, sessionId, { type: "pipeline.work_unit.created", id: args.id });
         return `Wrote ${file}`;
@@ -400,7 +249,7 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
         const sessionId = await resolveSessionId(worktree, args, context);
         await ensureDirs(worktree, sessionId);
         const name = `round-${String(args.round).padStart(3, "0")}-human.md`;
-        const file = path.join(sessionDir(worktree, sessionId), "debate", name);
+        const file = path.join(debateDir(worktree, sessionId), name);
         await appendFile(file, args.content + "\n\n", "utf8");
         await logEvent(worktree, sessionId, { type: "pipeline.human_context", round: args.round });
         return `Appended human context to ${file}`;

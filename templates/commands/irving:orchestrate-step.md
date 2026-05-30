@@ -7,9 +7,17 @@ First call irving_session. Use the returned session_id and base_path for every p
 
 All paths are under <base_path>/. Use this session_id for all pipeline tool calls.
 
+At the start of every iteration:
+1. Read state with pipeline_read_state.
+2. If phase is "planning" and planning.status is NOT "approved":
+   - Call pipeline_set_next_action with next_action = "needs_human"
+   - Reason: "Plan not approved. Run irving:debate first."
+   - Stop. Do not proceed.
+3. Only continue if the plan is approved.
+
 Do one of the following, and only one:
 
-1. Select ready work unit(s) and delegate to implementer.
+1. Read work unit files from work-units/*.md, parse YAML frontmatter for dependencies, and select ready work unit(s) to delegate to implementer.
 2. Review completed work by delegating to cheap-reviewer.
 3. Evaluate reviewer findings.
 4. Create revision work.

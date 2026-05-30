@@ -9,14 +9,11 @@
   },
   "files": [
     "dist",
-    "templates",
-    "bin"
+    "templates"
   ],
-  "bin": {
-    "oh-my-irving": "./bin/oh-my-irving.mjs"
-  },
   "scripts": {
     "build": "tsc && esbuild src/index.ts --bundle --platform=node --format=esm --external:@opencode-ai/plugin --outfile=dist/oh-my-irving.plugin.js",
+    "test": "tsc && node --test dist/**/*.test.js",
     "prepublishOnly": "npm run build"
   },
   "keywords": [

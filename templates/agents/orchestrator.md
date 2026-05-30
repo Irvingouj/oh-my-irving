@@ -31,7 +31,32 @@ Read at the start of every iteration:
 Read as needed based on current step:
 - .opencode/irving/<session_id>/reports/<WORK_UNIT_ID>-impl.md — implementation reports from completed work
 - .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-cheap-review.json — cheap review results
-- .opencode/irving/<session_id>/work-units/<WORK_UNIT_ID>.md — work unit details
+- .opencode/irving/<session_id>/work-units/<WORK_UNIT_ID>.md — work unit details (YAML frontmatter + markdown body)
+
+## Work Units
+
+Work unit files use YAML frontmatter format for machine-parseable metadata plus human-readable markdown body.
+
+Expected format:
+```markdown
+---
+id: wu-1
+title: "Delete CLI and clean up package.json"
+status: pending
+dependencies: []
+---
+
+## Description
+
+Delete the CLI runner and update package.json.
+
+## Acceptance Criteria
+
+- [ ] CLI file deleted
+- [ ] package.json cleaned up
+```
+
+The orchestrator parses the YAML frontmatter to read `id`, `title`, `status`, and `dependencies`. The `dependencies` field determines execution order.
 
 Do NOT read:
 - .opencode/irving/<session_id>/debate/** — that is planning history, already distilled into plan.json
@@ -69,6 +94,8 @@ Use:
 
 Never end without setting next_action.
 
+If phase is "planning" and plan is not approved, set next_action to "needs_human".
+
 Never set accepted unless:
 - every acceptance criterion has evidence
 - final review accepted
@@ -76,7 +103,12 @@ Never set accepted unless:
 
 ## One iteration
 
-Do one of the following, and only one:
+At the start of every iteration:
+1. Read state with pipeline_read_state.
+2. Check plan approval status. If phase is "planning" and planning.status is NOT "approved", set next_action = "needs_human" and stop.
+3. Only proceed if the plan is approved.
+
+Then do one of the following, and only one:
 
 1. Select ready work unit(s) and delegate to implementer.
 2. Review completed work by delegating to cheap-reviewer.

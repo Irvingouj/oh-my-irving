@@ -15,16 +15,30 @@ Read:
 - any human context in this conversation
 
 Process:
-1. Read the current context pack and any previous debate artifacts.
-2. Delegate exactly one Task to architect to produce the next design proposal.
-3. Wait for the architect result before doing anything else.
-4. Delegate exactly one Task to skeptic to review the architect proposal.
-5. Wait for the skeptic result before doing anything else.
-6. Synthesize the result into a debate round.
-7. Ask human whether to:
-   - provide more context
-   - ask for another design round
-   - accept the direction and draft plan
+1. Read the current state with pipeline_read_state. Note planning.round.
+2. Read the current context pack and any previous debate artifacts.
+3. Delegate exactly one Task to architect to produce the next design proposal.
+4. Wait for the architect result before doing anything else.
+5. Delegate exactly one Task to skeptic to review the architect proposal.
+6. Wait for the skeptic result before doing anything else.
+7. Synthesize the result into a debate round.
+8. Use pipeline_set_planning_status to increment the round count.
+
+Debate limits:
+- Maximum 8 debate rounds. Hard limit.
+- After each round, compare the current architect proposal and skeptic objections to the previous round.
+- If they are substantially the same (convergence detected), stop early.
+
+After each round, evaluate agreement:
+- If architect and skeptic both agree (no blockers, no major objections), OR
+- If convergence is detected, OR
+- If max rounds (8) reached:
+  - Use pipeline_set_planning_status to set status = "human_approval_pending"
+  - Ask human for approval of the plan direction
+
+If max rounds reached without agreement:
+  - Set status = "human_approval_pending" with note that debate did not converge
+  - Ask human to resolve the remaining disagreements
 
 You must actually delegate to architect and skeptic. Do not impersonate either role yourself.
 Use exactly one architect task and exactly one skeptic task per debate round. Do not spawn parallel architects or parallel skeptics.
@@ -50,3 +64,4 @@ If human accepts the direction:
 - set human_approval.status = "not_approved"
 
 Do not start implementation.
+The human must explicitly approve the plan before execution can start.
