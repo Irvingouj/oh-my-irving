@@ -19,6 +19,59 @@ import {
 } from "./state.js";
 import { validateState, validatePlan } from "./schema.js";
 
+export function parseYamlFrontmatter(content: string): { frontmatter: Record<string, unknown> | null; body: string } {
+  const match = content.match(/^---\n([\s\S]*?)\n---\n?([\s\S]*)$/);
+  if (!match) {
+    return { frontmatter: null, body: content };
+  }
+
+  const frontmatterText = match[1];
+  const body = match[2];
+
+  const frontmatter: Record<string, unknown> = {};
+  for (const line of frontmatterText.split("\n")) {
+    const colonIndex = line.indexOf(":");
+    if (colonIndex === -1) continue;
+    const key = line.slice(0, colonIndex).trim();
+    const value = line.slice(colonIndex + 1).trim();
+
+    if (value.startsWith("[") && value.endsWith("]")) {
+      try {
+        frontmatter[key] = JSON.parse(value);
+      } catch {
+        frontmatter[key] = value;
+      }
+    } else if (value === "true") {
+      frontmatter[key] = true;
+    } else if (value === "false") {
+      frontmatter[key] = false;
+    } else if (!isNaN(Number(value)) && value !== "") {
+      frontmatter[key] = Number(value);
+    } else {
+      frontmatter[key] = value.replace(/^["'](.*)["']$/, "$1");
+    }
+  }
+
+  return { frontmatter, body };
+}
+
+export function validateWorkUnitFrontmatter(frontmatter: Record<string, unknown> | null): string | null {
+  if (!frontmatter) return null;
+
+  const requiredFields = ["id", "title", "status", "dependencies"];
+  for (const field of requiredFields) {
+    if (!(field in frontmatter)) {
+      return `Missing required frontmatter field: ${field}`;
+    }
+  }
+
+  if (!Array.isArray(frontmatter.dependencies)) {
+    return "Field 'dependencies' must be an array";
+  }
+
+  return null;
+}
+
 function sessionIdArg() {
   return tool.schema.string().optional().describe("Session ID. Defaults to the current OpenCode session.");
 }
@@ -222,7 +275,7 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
     }),
 
     pipeline_create_work_unit_file: tool({
-      description: "Create or overwrite a work unit markdown file.",
+      description: "Create or overwrite a work unit markdown file. Validates YAML frontmatter if present.",
       args: {
         session_id: sessionIdArg(),
         id: tool.schema.string().describe("Work unit ID"),
@@ -231,6 +284,11 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
       async execute(args, context) {
         const sessionId = await resolveSessionId(worktree, args, context);
         await ensureDirs(worktree, sessionId);
+        const { frontmatter } = parseYamlFrontmatter(args.content);
+        const validationError = validateWorkUnitFrontmatter(frontmatter);
+        if (validationError) {
+          return `Error: ${validationError}`;
+        }
         const file = path.join(workUnitsDir(worktree, sessionId), `${args.id}.md`);
         await writeFile(file, args.content, "utf8");
         await logEvent(worktree, sessionId, { type: "pipeline.work_unit.created", id: args.id });

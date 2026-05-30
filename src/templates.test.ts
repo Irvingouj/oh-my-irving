@@ -37,6 +37,18 @@ describe("irving:debate command template", () => {
     );
   });
 
+  it("sets approved status when human approves", async () => {
+    const content = await readTemplate("commands", "irving:debate.md");
+    assert.ok(
+      content.includes('pipeline_set_planning_status with status "approved"'),
+      "Should call pipeline_set_planning_status with approved"
+    );
+    assert.ok(
+      content.includes('If human says "approved" or "yes"'),
+      "Should explicitly mention human approval trigger"
+    );
+  });
+
   it("uses pipeline_set_planning_status to track rounds", async () => {
     const content = await readTemplate("commands", "irving:debate.md");
     assert.ok(
