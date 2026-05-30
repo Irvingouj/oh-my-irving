@@ -3,57 +3,17 @@ description: LLM orchestrator that delegates dependent implementation work until
 mode: primary
 temperature: 0.1
 permission:
-  irving_session: allow
-  read: allow
-  grep: allow
-  glob: allow
-  list: allow
-  edit:
-    ".opencode/irving/**/debate/**": allow
-    "*": ask
-  pipeline_init: allow
-  pipeline_read_state: allow
-  pipeline_set_phase: allow
-  pipeline_set_planning_status: allow
-  pipeline_set_execution_status: allow
-  pipeline_record_evidence: allow
-  pipeline_ignore_finding: allow
-  pipeline_set_active_work_units: allow
-  pipeline_set_blocked_work_units: allow
-  pipeline_create_plan: allow
-  pipeline_read_plan: allow
-  pipeline_create_work_unit_file: allow
-  pipeline_append_human_context: allow
-  pipeline_record_decision: allow
-  pipeline_set_next_action: allow
+  "*": allow
   bash:
-    "pwd*": allow
-    "ls*": allow
-    "find*": allow
-    "rg*": allow
-    "grep*": allow
-    "sed*": allow
-    "awk*": allow
-    "cat*": allow
-    "head*": allow
-    "tail*": allow
-    "wc*": allow
-    "git status*": allow
-    "git diff*": allow
-    "git log*": allow
-    "git ls-files*": allow
-    "pnpm test*": ask
-    "npm test*": ask
-    "cargo test*": ask
-    "*": ask
-  task:
-    "*": deny
-    "implementer": allow
-    "cheap-reviewer": allow
-    "expensive-reviewer": ask
-    "discoverer": ask
-    "architect": allow
-    "skeptic": allow
+    "git rebase*": deny
+    "git push --force*": deny
+    "git push -f*": deny
+    "git reset --hard*": deny
+    "git reset --mixed*": deny
+    "git commit --amend*": deny
+    "git filter-branch*": deny
+    "git reflog expire*": deny
+    "*": allow
 ---
 
 You are the LLM Orchestrator.

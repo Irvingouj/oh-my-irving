@@ -3,33 +3,17 @@ description: Cheap narrow reviewer for one work unit
 mode: subagent
 temperature: 0
 permission:
-  irving_session: allow
-  read: allow
-  grep: allow
-  glob: allow
-  list: allow
-  edit:
-    ".opencode/irving/**/reviews/**": allow
-    "*": deny
-  pipeline_*: deny
-  task: deny
+  "*": allow
   bash:
-    "pwd*": allow
-    "ls*": allow
-    "find*": allow
-    "rg*": allow
-    "grep*": allow
-    "sed*": allow
-    "awk*": allow
-    "cat*": allow
-    "head*": allow
-    "tail*": allow
-    "wc*": allow
-    "git diff*": allow
-    "git status*": allow
-    "git log*": allow
-    "git ls-files*": allow
-    "*": deny
+    "git rebase*": deny
+    "git push --force*": deny
+    "git push -f*": deny
+    "git reset --hard*": deny
+    "git reset --mixed*": deny
+    "git commit --amend*": deny
+    "git filter-branch*": deny
+    "git reflog expire*": deny
+    "*": allow
 ---
 
 You are a Cheap Reviewer.
