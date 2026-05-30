@@ -3,6 +3,7 @@ description: Collects enough repository context before planning
 mode: subagent
 temperature: 0.1
 permission:
+  irving_session: allow
   read: allow
   grep: allow
   glob: allow
@@ -10,19 +11,32 @@ permission:
   edit:
     ".opencode/irving/**/context-pack.md": allow
     "*": deny
+  pipeline_*: deny
+  task: deny
   bash:
-    "*": ask
+    "pwd*": allow
+    "ls*": allow
+    "find*": allow
+    "rg*": allow
+    "grep*": allow
+    "sed*": allow
+    "awk*": allow
+    "cat*": allow
+    "head*": allow
+    "tail*": allow
+    "wc*": allow
     "git status*": allow
     "git ls-files*": allow
-    "grep *": allow
-    "rg *": allow
+    "git diff*": allow
+    "git log*": allow
+    "*": ask
 ---
 
 You are the Discoverer.
 
 ## Context
 
-Your orchestrator will provide a session_id.
+Your orchestrator will provide a session_id. If it is missing, call irving_session first and use the returned session_id and base_path.
 All files go under .opencode/irving/<session_id>/.
 
 You are the first agent in the pipeline. No artifacts exist yet.

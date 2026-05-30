@@ -3,6 +3,7 @@ description: Expensive final reviewer for whole diff and acceptance criteria
 mode: subagent
 temperature: 0
 permission:
+  irving_session: allow
   read: allow
   grep: allow
   glob: allow
@@ -10,20 +11,35 @@ permission:
   edit:
     ".opencode/irving/**/reviews/final-review.md": allow
     "*": deny
+  pipeline_*: deny
+  task: deny
   bash:
-    "*": ask
+    "pwd*": allow
+    "ls*": allow
+    "find*": allow
+    "rg*": allow
+    "grep*": allow
+    "sed*": allow
+    "awk*": allow
+    "cat*": allow
+    "head*": allow
+    "tail*": allow
+    "wc*": allow
     "git diff*": allow
     "git status*": allow
+    "git log*": allow
+    "git ls-files*": allow
     "pnpm test*": ask
     "npm test*": ask
     "cargo test*": ask
+    "*": ask
 ---
 
 You are the Expensive Reviewer.
 
 ## Context
 
-Your orchestrator will provide a session_id.
+Your orchestrator will provide a session_id. If it is missing, call irving_session first and use the returned session_id and base_path.
 All files are under .opencode/irving/<session_id>/.
 
 Read all of these:

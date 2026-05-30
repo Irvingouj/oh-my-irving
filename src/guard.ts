@@ -1,8 +1,75 @@
-import { mkdir, appendFile } from "node:fs/promises";
+import { mkdir, appendFile, readFile, writeFile } from "node:fs/promises";
+import { existsSync } from "node:fs";
 import path from "node:path";
 
 function irvingBaseDir(root: string) {
   return path.join(root, ".opencode", "irving");
+}
+
+function sessionAnchorPath(root: string) {
+  return path.join(irvingBaseDir(root), ".active-session.json");
+}
+
+async function assertSessionConsistent(worktree: string, sessionID: string) {
+  if (!sessionID) {
+    throw new Error("OpenCode TUI did not provide sessionID.");
+  }
+
+  const base = irvingBaseDir(worktree);
+  await mkdir(base, { recursive: true });
+
+  const file = sessionAnchorPath(worktree);
+  const now = new Date().toISOString();
+  if (!existsSync(file)) {
+    await writeFile(
+      file,
+      JSON.stringify(
+        {
+          version: 1,
+          root_session_id: sessionID,
+          child_session_ids: [],
+          created_at: now,
+          updated_at: now,
+        },
+        null,
+        2,
+      ) + "\n",
+      "utf8",
+    );
+    return;
+  }
+
+  const anchor = JSON.parse(await readFile(file, "utf8")) as {
+    session_id?: string;
+    root_session_id: string;
+    child_session_ids?: string[];
+    created_at?: string;
+    updated_at?: string;
+  };
+  const rootSessionId = anchor.root_session_id || anchor.session_id;
+  if (!rootSessionId) {
+    throw new Error(`Invalid Irving session anchor at ${file}: missing root_session_id.`);
+  }
+  const childSessionIds = anchor.child_session_ids ?? [];
+  if (sessionID !== rootSessionId && !childSessionIds.includes(sessionID)) {
+    childSessionIds.push(sessionID);
+  }
+
+  await writeFile(
+    file,
+    JSON.stringify(
+      {
+        version: 1,
+        root_session_id: rootSessionId,
+        child_session_ids: childSessionIds,
+        created_at: anchor.created_at ?? now,
+        updated_at: now,
+      },
+      null,
+      2,
+    ) + "\n",
+    "utf8",
+  );
 }
 
 async function appendJsonl(worktree: string, name: string, data: Record<string, unknown>) {
@@ -39,10 +106,13 @@ export function createGuardHooks(worktree: string) {
     "tool.execute.before": async (input: { tool: string; sessionID: string; callID: string }, output: { args: Record<string, unknown> }) => {
       const toolName = input.tool;
       const isWrite = toolName === "edit" || toolName === "write";
+      const sessionID = input.sessionID;
+      await assertSessionConsistent(worktree, sessionID);
 
       await appendJsonl(worktree, "tool-calls.jsonl", {
         type: "tool.before",
         tool: toolName,
+        session_id: sessionID,
         args: output.args,
       });
 
@@ -68,9 +138,7 @@ export function createGuardHooks(worktree: string) {
       });
     },
 
-    // Command templates use OpenCode's documented !`shell output` syntax to read
-    // OPENCODE_SESSION_ID. This hook is what makes the current TUI session visible
-    // to those shell snippets.
+    // Keep shell tools aware of the current OpenCode session.
     "shell.env": async (input: { cwd: string; sessionID?: string; callID?: string }, output: { env: Record<string, string> }) => {
       if (input.sessionID) {
         output.env.OPENCODE_SESSION_ID = input.sessionID;

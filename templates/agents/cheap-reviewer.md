@@ -3,6 +3,7 @@ description: Cheap narrow reviewer for one work unit
 mode: subagent
 temperature: 0
 permission:
+  irving_session: allow
   read: allow
   grep: allow
   glob: allow
@@ -10,10 +11,25 @@ permission:
   edit:
     ".opencode/irving/**/reviews/**": allow
     "*": deny
+  pipeline_*: deny
+  task: deny
   bash:
-    "*": deny
+    "pwd*": allow
+    "ls*": allow
+    "find*": allow
+    "rg*": allow
+    "grep*": allow
+    "sed*": allow
+    "awk*": allow
+    "cat*": allow
+    "head*": allow
+    "tail*": allow
+    "wc*": allow
     "git diff*": allow
     "git status*": allow
+    "git log*": allow
+    "git ls-files*": allow
+    "*": deny
 ---
 
 You are a Cheap Reviewer.

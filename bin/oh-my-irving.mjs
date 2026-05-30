@@ -117,7 +117,7 @@ if (command === "init") {
   console.log("=== Discovery ===\n");
   let code = run(repo, [
     "run", "--dir", repo,
-    "--command", "discover",
+    "--command", "irving:discover",
     taskDescription,
   ], sessionId);
   if (code !== 0) {
@@ -131,7 +131,7 @@ if (command === "init") {
   for (let round = 0; round < 20; round++) {
     code = run(repo, [
       "run", "--dir", repo,
-      "--command", "debate",
+      "--command", "irving:debate",
     ], sessionId);
     if (code !== 0) {
       console.error(`Debate failed (exit ${code})`);
@@ -146,7 +146,7 @@ if (command === "init") {
       if (answer && answer !== "continue") {
         code = run(repo, [
           "run", "--dir", repo,
-          "--command", "resume-after-human",
+          "--command", "irving:resume-after-human",
           answer,
         ], sessionId);
         if (code !== 0) process.exit(code);
@@ -171,7 +171,7 @@ if (command === "init") {
     } else {
       code = run(repo, [
         "run", "--dir", repo,
-        "--command", "resume-after-human",
+        "--command", "irving:resume-after-human",
         answer,
       ], sessionId);
       if (code !== 0) process.exit(code);
@@ -195,7 +195,7 @@ if (command === "init") {
 
     code = run(repo, [
       "run", "--dir", repo,
-      "--command", "orchestrate-step",
+      "--command", "irving:orchestrate-step",
     ], sessionId);
 
     if (code !== 0) {
@@ -215,7 +215,7 @@ if (command === "init") {
       console.log("\nRunning final review...\n");
       code = run(repo, [
         "run", "--dir", repo,
-        "--command", "final-review",
+        "--command", "irving:final-review",
       ], sessionId);
       if (code !== 0) process.exit(code);
       continue;
@@ -230,7 +230,7 @@ if (command === "init") {
       }
       code = run(repo, [
         "run", "--dir", repo,
-        "--command", "resume-after-human",
+        "--command", "irving:resume-after-human",
         answer,
       ], sessionId);
       if (code !== 0) process.exit(code);
@@ -285,7 +285,7 @@ if (command === "init") {
 
     const code = run(repo, [
       "run", "--dir", repo,
-      "--command", "orchestrate-step",
+      "--command", "irving:orchestrate-step",
     ], sessionId);
 
     if (code !== 0) {
@@ -305,7 +305,7 @@ if (command === "init") {
       console.log("\nRunning final review...\n");
       const reviewCode = run(repo, [
         "run", "--dir", repo,
-        "--command", "final-review",
+        "--command", "irving:final-review",
       ], sessionId);
       if (reviewCode !== 0) process.exit(reviewCode);
       continue;

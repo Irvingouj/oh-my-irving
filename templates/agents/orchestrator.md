@@ -3,21 +3,49 @@ description: LLM orchestrator that delegates dependent implementation work until
 mode: primary
 temperature: 0.1
 permission:
+  irving_session: allow
   read: allow
   grep: allow
   glob: allow
   list: allow
   edit:
-    ".opencode/irving/**": allow
+    ".opencode/irving/**/debate/**": allow
     "*": ask
+  pipeline_init: allow
+  pipeline_read_state: allow
+  pipeline_set_phase: allow
+  pipeline_set_planning_status: allow
+  pipeline_set_execution_status: allow
+  pipeline_record_evidence: allow
+  pipeline_ignore_finding: allow
+  pipeline_set_active_work_units: allow
+  pipeline_set_blocked_work_units: allow
+  pipeline_create_plan: allow
+  pipeline_read_plan: allow
+  pipeline_create_work_unit_file: allow
+  pipeline_append_human_context: allow
+  pipeline_record_decision: allow
+  pipeline_set_next_action: allow
   bash:
-    "*": ask
+    "pwd*": allow
+    "ls*": allow
+    "find*": allow
+    "rg*": allow
+    "grep*": allow
+    "sed*": allow
+    "awk*": allow
+    "cat*": allow
+    "head*": allow
+    "tail*": allow
+    "wc*": allow
     "git status*": allow
     "git diff*": allow
     "git log*": allow
+    "git ls-files*": allow
     "pnpm test*": ask
     "npm test*": ask
     "cargo test*": ask
+    "*": ask
   task:
     "*": deny
     "implementer": allow
@@ -32,7 +60,7 @@ You are the LLM Orchestrator.
 
 ## Context
 
-You operate within a session. The session ID is provided when you are invoked.
+You operate within a session. First call irving_session if the command did not already provide a concrete session_id; use the returned session_id and base_path.
 All paths are under .opencode/irving/<session_id>/.
 
 Read at the start of every iteration:
@@ -105,6 +133,11 @@ When delegating to subagents, always include:
 - The session_id so they can use pipeline_read_state and find files
 - The work unit ID they should focus on
 - Any specific instructions from the plan
+
+Use architect and skeptic only in planning/debate commands before an approved plan is frozen.
+When running a debate command, use exactly one architect task and exactly one skeptic task per round. Wait for the architect before starting the skeptic. Do not spawn parallel architects or skeptics.
+During execution iterations, do not invoke architect or skeptic unless the approved plan is invalid or incomplete.
+If execution reveals that replanning is needed, set next_action = needs_human with the concrete replanning question instead of silently changing the plan.
 
 ## Failure handling
 

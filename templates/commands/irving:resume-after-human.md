@@ -3,9 +3,9 @@ description: Resume orchestration after human supplied context
 agent: orchestrator
 ---
 
-session_id: !`.opencode/bin/session-id`
+First call irving_session. Use the returned session_id and base_path for every path below.
 
-All paths are under .opencode/irving/<session_id>/.
+All paths are under <base_path>/.
 
 Human has supplied new context:
 

@@ -3,16 +3,16 @@ description: Start or continue LLM orchestration loop
 agent: orchestrator
 ---
 
-session_id: !`.opencode/bin/session-id`
+First call irving_session. Use the returned session_id and base_path for every path below.
 
-All paths are under .opencode/irving/<session_id>/.
+All paths are under <base_path>/.
 
 Start or continue the implementation orchestration loop.
 
 Preconditions:
-- .opencode/irving/<session_id>/context-pack.md exists
-- .opencode/irving/<session_id>/plan.json exists
-- .opencode/irving/<session_id>/plan.json human_approval.status is "approved"
+- <base_path>/context-pack.md exists
+- <base_path>/plan.json exists
+- <base_path>/plan.json human_approval.status is "approved"
 
 Loop until all acceptance criteria are satisfied:
 1. Read state.

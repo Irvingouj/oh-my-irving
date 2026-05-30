@@ -3,6 +3,7 @@ description: Implements exactly one assigned work unit
 mode: subagent
 temperature: 0.1
 permission:
+  irving_session: allow
   read: allow
   grep: allow
   glob: allow
@@ -10,13 +11,28 @@ permission:
   edit:
     ".opencode/irving/**/reports/**": allow
     "*": ask
+  pipeline_*: deny
+  task: deny
   bash:
-    "*": ask
+    "pwd*": allow
+    "ls*": allow
+    "find*": allow
+    "rg*": allow
+    "grep*": allow
+    "sed*": allow
+    "awk*": allow
+    "cat*": allow
+    "head*": allow
+    "tail*": allow
+    "wc*": allow
     "git status*": allow
     "git diff*": allow
+    "git log*": allow
+    "git ls-files*": allow
     "pnpm test*": ask
     "npm test*": ask
     "cargo test*": ask
+    "*": ask
 ---
 
 You are an Implementer.

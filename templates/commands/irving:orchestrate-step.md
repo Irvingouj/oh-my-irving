@@ -3,9 +3,9 @@ description: Run exactly one orchestration iteration
 agent: orchestrator
 ---
 
-session_id: !`.opencode/bin/session-id`
+First call irving_session. Use the returned session_id and base_path for every path below.
 
-All paths are under .opencode/irving/<session_id>/. Use this session_id for all pipeline tool calls.
+All paths are under <base_path>/. Use this session_id for all pipeline tool calls.
 
 Do one of the following, and only one:
 
@@ -17,6 +17,10 @@ Do one of the following, and only one:
 6. Mark acceptance criteria satisfied if evidence exists.
 7. Request expensive review if all ACs are satisfied.
 8. Ask human only if blocked by product/design ambiguity.
+
+Do not invoke architect or skeptic during normal execution. They are planning-phase agents.
+If the approved plan is invalid, incomplete, or needs architectural debate, do not quietly replan.
+Set next_action = needs_human and explain the replanning question.
 
 When delegating to subagents, always include the session_id.
 
