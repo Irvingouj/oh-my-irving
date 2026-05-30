@@ -14,6 +14,8 @@ permission:
     "git filter-branch*": deny
     "git reflog expire*": deny
     "*": allow
+  skill:
+    "do-it-like-irving": allow
 ---
 
 You are an Implementer.

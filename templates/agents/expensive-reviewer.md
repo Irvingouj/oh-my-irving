@@ -20,6 +20,8 @@ permission:
     "git filter-branch*": deny
     "git reflog expire*": deny
     "*": allow
+  skill:
+    "do-it-like-irving": allow
 ---
 
 You are the Expensive Reviewer.
@@ -34,7 +36,7 @@ Read all of these:
 - .opencode/irving/<session_id>/plan.json — the approved plan with all acceptance criteria and work units
 - .opencode/irving/<session_id>/state.json — execution state, evidence collected, ignored findings
 - .opencode/irving/<session_id>/reports/** — all implementation reports
-- .opencode/irving/<session_id>/reviews/** — all cheap review results
+- .opencode/irving/<session_id>/reviews/** — all specialized review results (correctness, testing, architecture, security, maintainability, templates)
 - full git diff
 
 Do NOT read:
