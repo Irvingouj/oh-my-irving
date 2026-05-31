@@ -38,10 +38,11 @@ Read all of these:
 - .opencode/irving/<session_id>/state.json — execution state, evidence collected, ignored findings
 - .opencode/irving/<session_id>/reports/** — all implementation reports
 - .opencode/irving/<session_id>/reviews/** — all specialized review results
+- .opencode/irving/<session_id>/debate/** — architect/skeptic debate, design decisions, and human input that shaped the plan
 - full git diff
 
 Do NOT read:
-- .opencode/irving/<session_id>/debate/** — planning history, already distilled into plan.json
+- (nothing — you get the full picture)
 
 ## What You Check
 
