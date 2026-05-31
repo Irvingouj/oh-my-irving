@@ -27,8 +27,9 @@ function isProtectedFile(filePath: string): boolean {
 // --- Anti-loop detection ---
 
 const WINDOW_SIZE = 8;
-const SAME_TOOL_AND_ARGS_LIMIT = 2;
+const SAME_TOOL_AND_ARGS_LIMIT = 3;
 const SAME_TOOL_LIMIT = 4;
+const SAME_TOOL_WHITELIST = new Set(["bash", "read", "write", "edit", "glob", "grep", "list"]);
 
 type ToolCall = { tool: string; argsHash: string };
 
@@ -50,6 +51,63 @@ function stableStringify(value: unknown): string {
   return JSON.stringify(normalize(value));
 }
 
+const IDENTICAL_MESSAGES = [
+  // Strike 1
+  (tool: string, summary: string) =>
+    [
+      "[anti-loop] You are repeating yourself.",
+      "",
+      `You just called ${tool} with the exact same arguments. Doing the same thing and expecting different results is not a strategy.`,
+      `Args: ${summary}`,
+      "",
+      "Reconsider your approach. Try something different.",
+    ].join("\n"),
+  // Strike 2
+  (tool: string, summary: string) =>
+    [
+      "[anti-loop] You are STILL repeating the same call. This is the second warning.",
+      "",
+      `Tool: ${tool}`,
+      `Args: ${summary}`,
+      "",
+      "You ignored the first warning. That was a mistake. This call is not going to work no matter how many times you retry it.",
+      "STOP. Read the situation. Ask the user for help if you're stuck.",
+    ].join("\n"),
+  // Strike 3
+  (tool: string, summary: string) =>
+    [
+      "[anti-loop] THIRD WARNING. You have now tried this exact same call three times after being told to stop.",
+      "",
+      `Tool: ${tool}`,
+      `Args: ${summary}`,
+      "",
+      "This is not working. It will never work. You are wasting the user's time and tokens.",
+      "You MUST either: (1) ask the user what to do, or (2) pick a completely different approach.",
+      "Do NOT retry this call.",
+    ].join("\n"),
+];
+
+const SAME_TOOL_MESSAGES = [
+  (tool: string, count: number) =>
+    [
+      `[anti-loop] You've called ${tool} ${count} times in a row with different arguments but the same tool.`,
+      "",
+      "Are you making progress, or just thrashing? If you're stuck, ask the user.",
+    ].join("\n"),
+  (tool: string, count: number) =>
+    [
+      `[anti-loop] ${tool} again? That's ${count} consecutive calls. Second warning.`,
+      "",
+      "You're not thinking — you're just trying variations blindly. Stop and actually reason about what's wrong.",
+    ].join("\n"),
+  (tool: string, count: number) =>
+    [
+      `[anti-loop] ${tool} called ${count} times now. You are clearly stuck in a loop.`,
+      "",
+      "Retrying with slightly different arguments is not problem-solving. You need to step back and rethink entirely, or ask the user for guidance.",
+    ].join("\n"),
+];
+
 function checkAntiLoop(recent: ToolCall[], tool: string, args: Record<string, unknown>): void {
   const argsHash = stableStringify(args);
 
@@ -60,19 +118,13 @@ function checkAntiLoop(recent: ToolCall[], tool: string, args: Record<string, un
     else break;
   }
 
-  if (identicalRun >= SAME_TOOL_AND_ARGS_LIMIT) {
+  if (identicalRun >= 1 && identicalRun <= IDENTICAL_MESSAGES.length) {
     const summary = JSON.stringify(args);
-    throw new Error(
-      [
-        "[anti-loop] Repeated identical tool call detected.",
-        "",
-        `Tool: ${tool}`,
-        `Repeated: ${identicalRun + 1} times`,
-        `Args: ${summary.length > 500 ? summary.slice(0, 500) + "..." : summary}`,
-        "",
-        "Do not retry the same tool call. Stop and ask the user, or choose a different strategy.",
-      ].join("\n"),
-    );
+    const msgFn = IDENTICAL_MESSAGES[Math.min(identicalRun - 1, IDENTICAL_MESSAGES.length - 1)];
+    throw new Error(msgFn(tool, summary.length > 500 ? summary.slice(0, 500) + "..." : summary));
+  }
+  if (identicalRun > IDENTICAL_MESSAGES.length) {
+    throw new Error(`[anti-loop] BLOCKED. ${tool} called ${identicalRun + 1} times with identical args. Ask the user.`);
   }
 
   // Count consecutive same-tool calls (any args) at the tail
@@ -82,17 +134,10 @@ function checkAntiLoop(recent: ToolCall[], tool: string, args: Record<string, un
     else break;
   }
 
-  if (sameToolRun >= SAME_TOOL_LIMIT) {
-    throw new Error(
-      [
-        "[anti-loop] Possible tool-use loop detected.",
-        "",
-        `Tool: ${tool}`,
-        `Consecutive calls: ${sameToolRun + 1}`,
-        "",
-        "You keep calling the same tool. Pause and reconsider, or ask the user.",
-      ].join("\n"),
-    );
+  if (sameToolRun >= SAME_TOOL_LIMIT && !SAME_TOOL_WHITELIST.has(tool)) {
+    const msgIdx = Math.min(sameToolRun - SAME_TOOL_LIMIT, SAME_TOOL_MESSAGES.length - 1);
+    const msgFn = SAME_TOOL_MESSAGES[msgIdx];
+    throw new Error(msgFn(tool, sameToolRun + 1));
   }
 }
 
@@ -100,7 +145,7 @@ export function createGuardHooks(worktree: string) {
   const recentToolCalls: ToolCall[] = [];
 
   return {
-    event: async ({ event }: { event: { type: string; [key: string]: unknown } }) => {
+    event: async ({ event }: { event: { type: string;[key: string]: unknown } }) => {
       const sessionId = await resolveGuardSessionId(
         worktree,
         (event.session_id as string) || (event.sessionID as string),
@@ -123,11 +168,13 @@ export function createGuardHooks(worktree: string) {
       const sessionID = input.sessionID;
       await assertSessionConsistent(worktree, sessionID);
 
-      // Anti-loop check before logging/allowing the call
-      checkAntiLoop(recentToolCalls, toolName, output.args ?? {});
-
-      recentToolCalls.push({ tool: toolName, argsHash: stableStringify(output.args ?? {}) });
-      while (recentToolCalls.length > WINDOW_SIZE) recentToolCalls.shift();
+      // Check first, but always track the call — even blocked attempts advance the strike counter
+      try {
+        checkAntiLoop(recentToolCalls, toolName, output.args ?? {});
+      } finally {
+        recentToolCalls.push({ tool: toolName, argsHash: stableStringify(output.args ?? {}) });
+        while (recentToolCalls.length > WINDOW_SIZE) recentToolCalls.shift();
+      }
 
       await logEvent(worktree, sessionID, {
         type: "tool.before",

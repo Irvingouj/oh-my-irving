@@ -134,21 +134,54 @@ describe("createGuardHooks", () => {
       await hooks["tool.execute.before"](input, output);
     });
 
-    it("blocks same tool with identical args after 2 calls", async () => {
+    it("blocks on 1st repeat with strike 1 message", async () => {
       const args = { action: "needs_human", why: "Waiting for input" };
-      for (let i = 0; i < 2; i++) {
-        await hooks["tool.execute.before"](
-          { tool: "irving_next", sessionID: "ses-1", callID: `call-${i}` },
+      // Call 1: allowed
+      await hooks["tool.execute.before"](
+        { tool: "irving_next", sessionID: "ses-1", callID: "call-0" },
+        { args },
+      );
+      // Call 2: strike 1
+      await assert.rejects(
+        async () => await hooks["tool.execute.before"](
+          { tool: "irving_next", sessionID: "ses-1", callID: "call-1" },
           { args },
-        );
-      }
-      // 3rd identical call should be blocked
+        ),
+        /You are repeating yourself/,
+      );
+    });
+
+    it("escalates to strike 2 on 2nd repeat", async () => {
+      const args = { action: "needs_human", why: "Waiting for input" };
+      // Call 1: allowed
+      await hooks["tool.execute.before"](
+        { tool: "irving_next", sessionID: "ses-1", callID: "call-0" },
+        { args },
+      );
+      // Call 2: strike 1 (blocked but tracked)
+      try { await hooks["tool.execute.before"]({ tool: "irving_next", sessionID: "ses-1", callID: "call-1" }, { args }); } catch {}
+      // Call 3: strike 2
+      await assert.rejects(
+        async () => await hooks["tool.execute.before"](
+          { tool: "irving_next", sessionID: "ses-1", callID: "call-2" },
+          { args },
+        ),
+        /STILL repeating/,
+      );
+    });
+
+    it("escalates to strike 3 on 3rd repeat", async () => {
+      const args = { action: "needs_human", why: "Waiting for input" };
+      await hooks["tool.execute.before"]({ tool: "irving_next", sessionID: "ses-1", callID: "call-0" }, { args });
+      try { await hooks["tool.execute.before"]({ tool: "irving_next", sessionID: "ses-1", callID: "call-1" }, { args }); } catch {}
+      try { await hooks["tool.execute.before"]({ tool: "irving_next", sessionID: "ses-1", callID: "call-2" }, { args }); } catch {}
+      // Call 4: strike 3
       await assert.rejects(
         async () => await hooks["tool.execute.before"](
           { tool: "irving_next", sessionID: "ses-1", callID: "call-3" },
           { args },
         ),
-        /\[anti-loop\] Repeated identical tool call/,
+        /THIRD WARNING/,
       );
     });
 
@@ -171,34 +204,59 @@ describe("createGuardHooks", () => {
           { args: { action: `action-${i}`, why: `reason-${i}` } },
         );
       }
-      // 5th same-tool call should be blocked
+      // 5th same-tool call should be blocked with graduated message
       await assert.rejects(
         async () => await hooks["tool.execute.before"](
           { tool: "irving_next", sessionID: "ses-1", callID: "call-5" },
           { args: { action: "yet-another", why: "still going" } },
         ),
-        /\[anti-loop\] Possible tool-use loop/,
+        /\[anti-loop\]/,
       );
     });
 
     it("resets counter when a different tool is used", async () => {
       const args = { action: "needs_human", why: "waiting" };
-      // 2 identical calls
-      for (let i = 0; i < 2; i++) {
-        await hooks["tool.execute.before"](
-          { tool: "irving_next", sessionID: "ses-1", callID: `call-${i}` },
-          { args },
-        );
-      }
+      // 1 allowed call
+      await hooks["tool.execute.before"](
+        { tool: "irving_next", sessionID: "ses-1", callID: "call-0" },
+        { args },
+      );
       // Different tool resets the streak
       await hooks["tool.execute.before"](
         { tool: "irving_status", sessionID: "ses-1", callID: "call-break" },
         { args: {} },
       );
-      // Now irving_next with same args should be allowed again
+      // Now irving_next with same args should be allowed again (streak reset)
       await hooks["tool.execute.before"](
         { tool: "irving_next", sessionID: "ses-1", callID: "call-after" },
         { args },
+      );
+    });
+
+    it("whitelisted tools are exempt from same-tool limit", async () => {
+      // bash can be called 6 times with different args — no block
+      for (let i = 0; i < 6; i++) {
+        await hooks["tool.execute.before"](
+          { tool: "bash", sessionID: "ses-1", callID: `call-${i}` },
+          { args: { command: `echo ${i}` } },
+        );
+      }
+    });
+
+    it("whitelisted tools still blocked on identical args", async () => {
+      const args = { command: "git status" };
+      // Call 1: allowed
+      await hooks["tool.execute.before"](
+        { tool: "bash", sessionID: "ses-1", callID: "call-0" },
+        { args },
+      );
+      // Call 2: strike 1 (identical args, even for whitelisted tools)
+      await assert.rejects(
+        async () => await hooks["tool.execute.before"](
+          { tool: "bash", sessionID: "ses-1", callID: "call-1" },
+          { args },
+        ),
+        /\[anti-loop\]/,
       );
     });
   });
