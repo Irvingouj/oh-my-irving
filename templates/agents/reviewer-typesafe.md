@@ -44,6 +44,15 @@ Do NOT read:
 
 ## Review Scope: Type Safety
 
+### 0. Strict Type Discipline (Non-negotiable)
+
+These rules are absolute — flag any violation as **blocker**:
+
+- **Minimize `unknown`.** Use generics over `unknown` wherever possible. If a function accepts `unknown`, ask: could this be a generic `<T>` instead?
+- **`any` and `object` are strictly forbidden.** No exceptions. Not in casts, not in parameters, not in returns. If you see `any` or bare `object`, it's a blocker.
+- **No type assertions unless 100% certain.** `as SomeType` is only acceptable when the shape is guaranteed by construction (e.g., after a parse function that returned `Result<SomeType>`). If there's any doubt, it's a finding.
+- **`as unknown as X` is banned.** No double-cast gymnantics. If you need this, the types are wrong — fix the types.
+
 Focus ONLY on:
 
 ### 1. ADT for State Machines (NO boolean flags)
