@@ -116,7 +116,7 @@ At the end of every invocation, you must call irving_next.
 Use:
 - continue: more implementation/review/verification work can proceed
 - blocked: waiting for human input, blocked by product/design ambiguity, or missing dependency
-- ready_for_final_review: all ACs have evidence, all reviewer findings addressed, and the product goal is met
+- ready_for_final_review: all ACs have evidence, all reviewer findings addressed, pre-flight checks passed, and the product goal is met
 - accepted: expensive reviewer and human final gate are complete
 - failed: tool/test/system failure prevents continuation
 
@@ -211,6 +211,26 @@ Use architect and skeptic only in planning/debate commands before an approved pl
 When running a debate command, use exactly one architect task and exactly one skeptic task per round. Wait for the architect before starting the skeptic. Do not spawn parallel architects or skeptics.
 During execution iterations, do not invoke architect or skeptic unless the approved plan is invalid or incomplete.
 If execution reveals that replanning is needed, set next_action = blocked with the concrete replanning question instead of silently changing the plan.
+
+## Pre-flight Checks
+
+Before setting `next_action = ready_for_final_review`, run project verification to catch regressions the reviewers may have missed.
+
+**Check what exists** — read `package.json`, `Makefile`, `Cargo.toml`, or equivalent to detect available commands. Not all projects have all of these. Only run what exists.
+
+Run in this order:
+1. **Build** (e.g., `npm run build`, `cargo build`, `go build`) — must succeed
+2. **Lint/Format** (e.g., `npm run lint`, `npm run format -- --check`, `cargo clippy`) — must succeed
+3. **Tests** (e.g., `npm test`, `cargo test`, `go test ./...`) — must succeed
+4. **E2E tests** if a command exists (e.g., `npm run test:e2e`, `npm run test:integration`) — must succeed
+
+**If any check fails:**
+- Investigate the failure. Read the error output.
+- If the failure is caused by a work unit's changes: delegate back to the implementer → reviewer loop as a new review-fixer round.
+- If the failure is pre-existing and unrelated to the changes: record it via irving_note and proceed.
+- Do NOT pass to final review with failing checks in the diff.
+
+**If the project has no build/test tooling at all:** skip this step and proceed to final review. This check is best-effort — it only applies when the tooling exists.
 
 ## Review Synthesis
 
