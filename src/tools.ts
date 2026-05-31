@@ -72,23 +72,21 @@ export function validateWorkUnitFrontmatter(frontmatter: Record<string, unknown>
   return null;
 }
 
-function sessionIdArg() {
-  return tool.schema.string().optional().describe("Session ID. Defaults to the current OpenCode session.");
+async function autoSessionId(worktree: string, context: ToolContext): Promise<string> {
+  return await currentSessionId(worktree, context);
 }
 
-async function resolveSessionId(root: string, args: { session_id?: string | null }, context: ToolContext): Promise<string> {
-  return await currentSessionId(root, context, args.session_id);
+function parseLines(raw: string): string[] {
+  return raw.split("\n").map(l => l.trim()).filter(Boolean);
 }
 
 export function createPipelineTools(worktree: string): Record<string, ToolDefinition> {
   return {
     irving_session: tool({
-      description: "Return the current OpenCode session id and Irving artifact directory.",
-      args: {
-        session_id: sessionIdArg(),
-      },
-      async execute(args, context) {
-        const sessionId = await currentSessionId(worktree, context, args.session_id);
+      description: "Get session info. Call once at start. Returns session_id and base_path.",
+      args: {},
+      async execute(_args, context) {
+        const sessionId = await autoSessionId(worktree, context);
         await ensureDirs(worktree, sessionId);
         return JSON.stringify({
           session_id: sessionId,
@@ -97,255 +95,194 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
       },
     }),
 
-    pipeline_init: tool({
-      description: "Initialize pipeline state for the current OpenCode session. Returns the session ID.",
+    irving_status: tool({
+      description: "Read current pipeline state and plan in one call.",
       args: {},
       async execute(_args, context) {
-        const sessionId = await currentSessionId(worktree, context);
+        const sessionId = await autoSessionId(worktree, context);
+        await ensureDirs(worktree, sessionId);
         const state = await readStateFile(worktree, sessionId);
-        validateState(state);
-        await writeStateFile(worktree, sessionId, state);
-        await logEvent(worktree, sessionId, { type: "pipeline.init" });
-        return `Session ${sessionId} initialized. Path: .opencode/irving/${sessionId}/`;
+        const planFile = planPath(worktree, sessionId);
+        let plan = null;
+        if (existsSync(planFile)) {
+          plan = await readPlanFile(worktree, sessionId);
+        }
+        return JSON.stringify({ state, plan }, null, 2);
       },
     }),
 
-    pipeline_read_state: tool({
-      description: "Read state.json for a session.",
+    irving_advance: tool({
+      description: 'Move pipeline forward. Use a phase name like "discovery" "planning" "execution" "final_review" "accepted" or "round:N" to bump debate round.',
       args: {
-        session_id: sessionIdArg(),
+        to: tool.schema.string().describe("Target phase or round:N"),
       },
       async execute(args, context) {
-        const sessionId = await resolveSessionId(worktree, args, context);
-        return JSON.stringify(await readStateFile(worktree, sessionId), null, 2);
-      },
-    }),
-
-    pipeline_set_phase: tool({
-      description: "Set top-level pipeline phase.",
-      args: {
-        session_id: sessionIdArg(),
-        phase: tool.schema.enum(["init", "discovery", "planning", "execution", "final_review", "accepted", "blocked"]),
-      },
-      async execute(args, context) {
-        const sessionId = await resolveSessionId(worktree, args, context);
+        const sessionId = await autoSessionId(worktree, context);
         const state = await readStateFile(worktree, sessionId);
-        state.phase = args.phase;
+        const target = args.to;
+
+        if (target.startsWith("round:")) {
+          const n = parseInt(target.slice(6), 10);
+          state.planning.round = n;
+          state.planning.status = "debating";
+          await writeStateFile(worktree, sessionId, state);
+          await logEvent(worktree, sessionId, { type: "pipeline.round", round: n });
+          return `Round set to ${n}`;
+        }
+
+        const phases = ["init", "discovery", "planning", "execution", "final_review", "accepted", "blocked"];
+        if (!phases.includes(target)) {
+          return `Unknown phase: ${target}. Valid: ${phases.join(", ")}`;
+        }
+        state.phase = target as typeof state.phase;
         await writeStateFile(worktree, sessionId, state);
-        await logEvent(worktree, sessionId, { type: "pipeline.phase", phase: args.phase });
-        return `Phase set to ${args.phase}`;
+        await logEvent(worktree, sessionId, { type: "pipeline.phase", phase: target });
+        return `Phase set to ${target}`;
       },
     }),
 
-    pipeline_set_planning_status: tool({
-      description: "Set planning sub-status and increment round if needed.",
+    irving_plan: tool({
+      description: "Create the plan. Each arg is a simple string.",
       args: {
-        session_id: sessionIdArg(),
-        status: tool.schema.string().describe("New planning status"),
-        increment_round: tool.schema.boolean().default(false).describe("Whether to increment the debate round"),
+        objective: tool.schema.string().describe("One sentence goal"),
+        criteria: tool.schema.string().describe("Acceptance criteria, one per line: AC-1: description"),
+        units: tool.schema.string().describe("Work units, one per line: wu-1: description (depends: wu-0)"),
       },
       async execute(args, context) {
-        const sessionId = await resolveSessionId(worktree, args, context);
-        const state = await readStateFile(worktree, sessionId);
-        state.planning.status = args.status;
-        if (args.increment_round) state.planning.round += 1;
-        await writeStateFile(worktree, sessionId, state);
-        await logEvent(worktree, sessionId, { type: "pipeline.planning_status", status: args.status, round: state.planning.round });
-        return `Planning status set to ${args.status} (round ${state.planning.round})`;
-      },
-    }),
+        const sessionId = await autoSessionId(worktree, context);
+        await ensureDirs(worktree, sessionId);
 
-    pipeline_set_execution_status: tool({
-      description: "Set execution sub-status and optionally increment iteration.",
-      args: {
-        session_id: sessionIdArg(),
-        status: tool.schema.string().describe("New execution status"),
-        increment_iteration: tool.schema.boolean().default(false).describe("Whether to increment the iteration counter"),
-      },
-      async execute(args, context) {
-        const sessionId = await resolveSessionId(worktree, args, context);
-        const state = await readStateFile(worktree, sessionId);
-        state.execution.status = args.status;
-        if (args.increment_iteration) state.execution.iteration += 1;
-        await writeStateFile(worktree, sessionId, state);
-        await logEvent(worktree, sessionId, { type: "pipeline.execution_status", status: args.status, iteration: state.execution.iteration });
-        return `Execution status set to ${args.status} (iteration ${state.execution.iteration})`;
-      },
-    }),
+        const acceptance_criteria = parseLines(args.criteria).map(line => {
+          const colonIdx = line.indexOf(":");
+          if (colonIdx === -1) return { id: `AC-${Date.now()}`, description: line, status: "pending" };
+          return { id: line.slice(0, colonIdx).trim(), description: line.slice(colonIdx + 1).trim(), status: "pending" };
+        });
 
-    pipeline_record_evidence: tool({
-      description: "Record evidence for an acceptance criterion.",
-      args: {
-        session_id: sessionIdArg(),
-        ac_id: tool.schema.string().describe("Acceptance criterion ID"),
-        type: tool.schema.enum(["test", "review", "manual", "static"]),
-        detail: tool.schema.string().describe("What evidence was observed"),
-      },
-      async execute(args, context) {
-        const sessionId = await resolveSessionId(worktree, args, context);
-        const state = await readStateFile(worktree, sessionId);
-        state.execution.evidence.push({ ac_id: args.ac_id, type: args.type, detail: args.detail });
-        await writeStateFile(worktree, sessionId, state);
-        await logEvent(worktree, sessionId, { type: "pipeline.evidence", ac_id: args.ac_id, evidence_type: args.type, detail: args.detail });
-        return `Recorded evidence for ${args.ac_id}`;
-      },
-    }),
+        const work_units = parseLines(args.units).map(line => {
+          const depMatch = line.match(/\(depends:\s*([^)]+)\)/i);
+          const deps = depMatch ? depMatch[1].split(",").map(s => s.trim()) : [];
+          const clean = line.replace(/\(depends:[^)]*\)/i, "").trim();
+          const colonIdx = clean.indexOf(":");
+          if (colonIdx === -1) return { id: `wu-${Date.now()}`, description: clean, status: "pending", dependencies: deps };
+          return { id: clean.slice(0, colonIdx).trim(), description: clean.slice(colonIdx + 1).trim(), status: "pending", dependencies: deps };
+        });
 
-    pipeline_ignore_finding: tool({
-      description: "Record that the orchestrator ignored a reviewer finding with reason.",
-      args: {
-        session_id: sessionIdArg(),
-        finding_id: tool.schema.string().describe("ID of the ignored finding"),
-        reason: tool.schema.string().describe("Why it was ignored"),
-      },
-      async execute(args, context) {
-        const sessionId = await resolveSessionId(worktree, args, context);
-        const state = await readStateFile(worktree, sessionId);
-        state.execution.ignored_findings.push({ finding_id: args.finding_id, reason: args.reason });
-        await writeStateFile(worktree, sessionId, state);
-        await logEvent(worktree, sessionId, { type: "pipeline.ignore_finding", finding_id: args.finding_id, reason: args.reason });
-        return `Ignored finding ${args.finding_id}`;
-      },
-    }),
-
-    pipeline_set_active_work_units: tool({
-      description: "Set the list of currently active work unit IDs.",
-      args: {
-        session_id: sessionIdArg(),
-        ids: tool.schema.array(tool.schema.string()).describe("Work unit IDs"),
-      },
-      async execute(args, context) {
-        const sessionId = await resolveSessionId(worktree, args, context);
-        const state = await readStateFile(worktree, sessionId);
-        state.execution.active_work_units = args.ids;
-        await writeStateFile(worktree, sessionId, state);
-        await logEvent(worktree, sessionId, { type: "pipeline.active_wu", ids: args.ids });
-        return `Active work units: ${args.ids.join(", ") || "none"}`;
-      },
-    }),
-
-    pipeline_set_blocked_work_units: tool({
-      description: "Set the list of currently blocked work unit IDs.",
-      args: {
-        session_id: sessionIdArg(),
-        ids: tool.schema.array(tool.schema.string()).describe("Work unit IDs"),
-      },
-      async execute(args, context) {
-        const sessionId = await resolveSessionId(worktree, args, context);
-        const state = await readStateFile(worktree, sessionId);
-        state.execution.blocked_work_units = args.ids;
-        await writeStateFile(worktree, sessionId, state);
-        await logEvent(worktree, sessionId, { type: "pipeline.blocked_wu", ids: args.ids });
-        return `Blocked work units: ${args.ids.join(", ") || "none"}`;
-      },
-    }),
-
-    pipeline_create_plan: tool({
-      description: "Create or overwrite plan.json for a session. Use this instead of writing plan.json directly.",
-      args: {
-        session_id: sessionIdArg(),
-        plan: tool.schema.string().describe("JSON string of the plan object"),
-      },
-      async execute(args, context) {
-        const sessionId = await resolveSessionId(worktree, args, context);
-        const plan = JSON.parse(args.plan);
+        const plan = { objective: args.objective, acceptance_criteria, work_units };
         validatePlan(plan);
         await writePlanFile(worktree, sessionId, plan);
         await logEvent(worktree, sessionId, { type: "pipeline.plan_created" });
-        return `Wrote ${planPath(worktree, sessionId)}`;
+        return `Plan created with ${acceptance_criteria.length} criteria and ${work_units.length} work units`;
       },
     }),
 
-    pipeline_read_plan: tool({
-      description: "Read plan.json for a session.",
+    irving_work_unit: tool({
+      description: "Create a work unit file. The body is the implementation instructions.",
       args: {
-        session_id: sessionIdArg(),
+        id: tool.schema.string().describe("Work unit ID like wu-1"),
+        title: tool.schema.string().describe("Short title"),
+        body: tool.schema.string().describe("Description and acceptance criteria"),
       },
       async execute(args, context) {
-        const sessionId = await resolveSessionId(worktree, args, context);
+        const sessionId = await autoSessionId(worktree, context);
         await ensureDirs(worktree, sessionId);
-        const file = planPath(worktree, sessionId);
-        if (!existsSync(file)) {
-          return "plan.json does not exist yet";
-        }
-        const plan = await readPlanFile(worktree, sessionId);
-        validatePlan(plan);
-        return JSON.stringify(plan, null, 2);
-      },
-    }),
-
-    pipeline_create_work_unit_file: tool({
-      description: "Create or overwrite a work unit markdown file. Validates YAML frontmatter if present.",
-      args: {
-        session_id: sessionIdArg(),
-        id: tool.schema.string().describe("Work unit ID"),
-        content: tool.schema.string().describe("Markdown content"),
-      },
-      async execute(args, context) {
-        const sessionId = await resolveSessionId(worktree, args, context);
-        await ensureDirs(worktree, sessionId);
-        const { frontmatter } = parseYamlFrontmatter(args.content);
+        const content = `---\nid: ${args.id}\ntitle: "${args.title}"\nstatus: pending\ndependencies: []\n---\n\n${args.body}`;
+        const { frontmatter } = parseYamlFrontmatter(content);
         const validationError = validateWorkUnitFrontmatter(frontmatter);
         if (validationError) {
           return `Error: ${validationError}`;
         }
         const file = path.join(workUnitsDir(worktree, sessionId), `${args.id}.md`);
-        await writeFile(file, args.content, "utf8");
+        await writeFile(file, content, "utf8");
         await logEvent(worktree, sessionId, { type: "pipeline.work_unit.created", id: args.id });
-        return `Wrote ${file}`;
+        return `Created work unit ${args.id}`;
       },
     }),
 
-    pipeline_append_human_context: tool({
-      description: "Append human-supplied context into the current debate round.",
+    irving_delegate: tool({
+      description: "Set which work units are active and which are blocked.",
       args: {
-        session_id: sessionIdArg(),
-        round: tool.schema.number().describe("Debate round number"),
-        content: tool.schema.string().describe("Human context"),
+        active: tool.schema.array(tool.schema.string()).describe("Work unit IDs to activate"),
+        blocked: tool.schema.array(tool.schema.string()).describe("Work unit IDs that are blocked"),
       },
       async execute(args, context) {
-        const sessionId = await resolveSessionId(worktree, args, context);
-        await ensureDirs(worktree, sessionId);
-        const name = `round-${String(args.round).padStart(3, "0")}-human.md`;
-        const file = path.join(debateDir(worktree, sessionId), name);
-        await appendFile(file, args.content + "\n\n", "utf8");
-        await logEvent(worktree, sessionId, { type: "pipeline.human_context", round: args.round });
-        return `Appended human context to ${file}`;
-      },
-    }),
-
-    pipeline_record_decision: tool({
-      description: "Record an orchestrator decision with reasoning.",
-      args: {
-        session_id: sessionIdArg(),
-        decision: tool.schema.string().describe("What was decided"),
-        reasoning: tool.schema.string().describe("Why"),
-        work_unit: tool.schema.string().optional().describe("Related work unit ID"),
-      },
-      async execute(args, context) {
-        const sessionId = await resolveSessionId(worktree, args, context);
-        await logEvent(worktree, sessionId, { type: "pipeline.decision", decision: args.decision, reasoning: args.reasoning, work_unit: args.work_unit ?? null });
-        return `Recorded decision: ${args.decision}`;
-      },
-    }),
-
-    pipeline_set_next_action: tool({
-      description: "Set the next action for the external orchestration loop. Must be called at end of every orchestrator invocation.",
-      args: {
-        session_id: sessionIdArg(),
-        next_action: tool.schema.enum(["continue", "needs_human", "ready_for_final_review", "accepted", "blocked", "failed"]).describe("What the external runner should do next"),
-        reason: tool.schema.string().describe("Why"),
-        blocking_question: tool.schema.string().optional().describe("Question for human if needs_human"),
-      },
-      async execute(args, context) {
-        const sessionId = await resolveSessionId(worktree, args, context);
+        const sessionId = await autoSessionId(worktree, context);
         const state = await readStateFile(worktree, sessionId);
-        state.execution.next_action = args.next_action;
-        state.execution.reason = args.reason;
-        state.execution.blocking_question = args.blocking_question ?? null;
+        state.execution.active_work_units = args.active;
+        state.execution.blocked_work_units = args.blocked;
         await writeStateFile(worktree, sessionId, state);
-        await logEvent(worktree, sessionId, { type: "pipeline.next_action", next_action: args.next_action, reason: args.reason, iteration: state.execution.iteration });
-        return JSON.stringify({ next_action: args.next_action, reason: args.reason, blocking_question: args.blocking_question ?? null, iteration: state.execution.iteration });
+        await logEvent(worktree, sessionId, { type: "pipeline.delegate", active: args.active, blocked: args.blocked });
+        return `Active: ${args.active.join(", ") || "none"}. Blocked: ${args.blocked.join(", ") || "none"}`;
+      },
+    }),
+
+    irving_evidence: tool({
+      description: "Record evidence that an acceptance criterion is satisfied.",
+      args: {
+        ac_id: tool.schema.string().describe("Acceptance criterion ID like AC-1"),
+        detail: tool.schema.string().describe("What was verified and how"),
+      },
+      async execute(args, context) {
+        const sessionId = await autoSessionId(worktree, context);
+        const state = await readStateFile(worktree, sessionId);
+        state.execution.evidence.push({ ac_id: args.ac_id, type: "review", detail: args.detail });
+        await writeStateFile(worktree, sessionId, state);
+        await logEvent(worktree, sessionId, { type: "pipeline.evidence", ac_id: args.ac_id, detail: args.detail });
+        return `Evidence recorded for ${args.ac_id}`;
+      },
+    }),
+
+    irving_skip: tool({
+      description: "Skip a reviewer finding with a reason.",
+      args: {
+        finding_id: tool.schema.string().describe("Finding ID to skip"),
+        why: tool.schema.string().describe("Why this finding is being ignored"),
+      },
+      async execute(args, context) {
+        const sessionId = await autoSessionId(worktree, context);
+        const state = await readStateFile(worktree, sessionId);
+        state.execution.ignored_findings.push({ finding_id: args.finding_id, reason: args.why });
+        await writeStateFile(worktree, sessionId, state);
+        await logEvent(worktree, sessionId, { type: "pipeline.skip", finding_id: args.finding_id });
+        return `Skipped finding ${args.finding_id}`;
+      },
+    }),
+
+    irving_note: tool({
+      description: "Record a decision, human context, or any note for the audit trail.",
+      args: {
+        kind: tool.schema.string().describe("Type: decision, human_context, or general"),
+        text: tool.schema.string().describe("The note content"),
+      },
+      async execute(args, context) {
+        const sessionId = await autoSessionId(worktree, context);
+        await ensureDirs(worktree, sessionId);
+        if (args.kind === "human_context") {
+          const state = await readStateFile(worktree, sessionId);
+          const name = `round-${String(state.planning.round).padStart(3, "0")}-human.md`;
+          await appendFile(path.join(debateDir(worktree, sessionId), name), args.text + "\n\n", "utf8");
+        }
+        await logEvent(worktree, sessionId, { type: "pipeline.note", kind: args.kind, text: args.text });
+        return `Recorded ${args.kind} note`;
+      },
+    }),
+
+    irving_next: tool({
+      description: "End this iteration. Say what happens next.",
+      args: {
+        action: tool.schema.string().describe("continue, needs_human, ready_for_final_review, accepted, blocked, or failed"),
+        why: tool.schema.string().describe("One sentence explaining why"),
+      },
+      async execute(args, context) {
+        const sessionId = await autoSessionId(worktree, context);
+        const state = await readStateFile(worktree, sessionId);
+        const valid = ["continue", "needs_human", "ready_for_final_review", "accepted", "blocked", "failed"];
+        const action = valid.includes(args.action) ? args.action : "needs_human";
+        state.execution.next_action = action as typeof state.execution.next_action;
+        state.execution.reason = args.why;
+        state.execution.blocking_question = action === "needs_human" ? args.why : null;
+        await writeStateFile(worktree, sessionId, state);
+        await logEvent(worktree, sessionId, { type: "pipeline.next_action", action, why: args.why });
+        return `${action}: ${args.why} (iteration ${state.execution.iteration})`;
       },
     }),
   };

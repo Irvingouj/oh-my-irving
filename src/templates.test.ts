@@ -24,9 +24,9 @@ describe("irving:debate command template", () => {
     assert.ok(content.includes("substantially the same"), "Should mention substantial sameness check");
   });
 
-  it("sets human_approval_pending when agreement reached", async () => {
+  it("asks for human approval when agreement reached", async () => {
     const content = await readTemplate("commands", "irving:debate.md");
-    assert.ok(content.includes('status = "human_approval_pending"'), "Should set human_approval_pending status");
+    assert.ok(content.includes("Ask human for approval"), "Should ask human for approval");
   });
 
   it("requires human explicit approval before execution", async () => {
@@ -37,23 +37,23 @@ describe("irving:debate command template", () => {
     );
   });
 
-  it("sets approved status when human approves", async () => {
+  it("uses irving_plan when human approves", async () => {
     const content = await readTemplate("commands", "irving:debate.md");
     assert.ok(
-      content.includes('pipeline_set_planning_status with status "approved"'),
-      "Should call pipeline_set_planning_status with approved"
+      content.includes("call irving_plan"),
+      "Should use irving_plan"
     );
     assert.ok(
-      content.includes('If human says "approved" or "yes"'),
-      "Should explicitly mention human approval trigger"
+      content.includes('call irving_advance with "approved"'),
+      "Should advance to approved"
     );
   });
 
-  it("uses pipeline_set_planning_status to track rounds", async () => {
+  it("uses irving_advance to track rounds", async () => {
     const content = await readTemplate("commands", "irving:debate.md");
     assert.ok(
-      content.includes("pipeline_set_planning_status"),
-      "Should use pipeline_set_planning_status"
+      content.includes("irving_advance"),
+      "Should use irving_advance"
     );
   });
 });
@@ -65,9 +65,9 @@ describe("irving:orchestrate command template", () => {
     assert.ok(content.includes("Plan not approved. Run irving:debate first."), "Should mention debate first");
   });
 
-  it("sets next_action to needs_human when plan not approved", async () => {
+  it("calls irving_next with needs_human when plan not approved", async () => {
     const content = await readTemplate("commands", "irving:orchestrate.md");
-    assert.ok(content.includes('next_action = "needs_human"'), "Should set needs_human");
+    assert.ok(content.includes('"needs_human"'), "Should set needs_human");
   });
 });
 
@@ -78,9 +78,9 @@ describe("irving:orchestrate-step command template", () => {
     assert.ok(content.includes("Plan not approved. Run irving:debate first."), "Should mention debate first");
   });
 
-  it("sets next_action to needs_human when plan not approved", async () => {
+  it("calls irving_next with needs_human when plan not approved", async () => {
     const content = await readTemplate("commands", "irving:orchestrate-step.md");
-    assert.ok(content.includes('next_action = "needs_human"'), "Should set needs_human");
+    assert.ok(content.includes('"needs_human"'), "Should set needs_human");
   });
 });
 
@@ -88,8 +88,8 @@ describe("orchestrator agent template", () => {
   it("mentions plan approval check in loop contract", async () => {
     const content = await readTemplate("agents", "orchestrator.md");
     assert.ok(
-      content.includes('If phase is "planning" and plan is not approved, set next_action to "needs_human"'),
-      "Should mention plan approval check in loop contract"
+      content.includes("If phase is") && content.includes("needs_human"),
+      "Should mention plan approval check"
     );
   });
 

@@ -85,6 +85,7 @@ export async function currentSessionId(
 
   const file = sessionAnchorPath(root);
   const now = new Date().toISOString();
+
   if (!existsSync(file)) {
     const rootSessionId = requestedSessionId || contextSessionId;
     const anchor: SessionAnchor = {
@@ -103,33 +104,63 @@ export async function currentSessionId(
   if (!rootSessionId) {
     throw new Error(`Invalid Irving session anchor at ${file}: missing root_session_id.`);
   }
+
+  // If context session is the root → continuing same conversation
+  if (contextSessionId === rootSessionId) {
+    await writeFile(
+      file,
+      JSON.stringify({ ...anchor, updated_at: now }, null, 2) + "\n",
+      "utf8",
+    );
+    return rootSessionId;
+  }
+
+  // If context session is a known child → subagent call
+  const childSessionIds = anchor.child_session_ids ?? [];
+  if (childSessionIds.includes(contextSessionId)) {
+    return rootSessionId;
+  }
+
+  // context session is neither root nor child
+
+  // If an explicit requestedSessionId matches the root → subagent that knows its parent
+  if (requestedSessionId && requestedSessionId === rootSessionId) {
+    childSessionIds.push(contextSessionId);
+    await writeFile(
+      file,
+      JSON.stringify(
+        {
+          version: 1,
+          root_session_id: rootSessionId,
+          child_session_ids: childSessionIds,
+          created_at: anchor.created_at ?? now,
+          updated_at: now,
+        },
+        null,
+        2,
+      ) + "\n",
+      "utf8",
+    );
+    return rootSessionId;
+  }
+
+  // Explicit mismatch → error
   if (requestedSessionId && requestedSessionId !== rootSessionId) {
     throw new Error(
       `Irving session mismatch. Expected root session ${rootSessionId}, got requested session ${requestedSessionId}.`,
     );
   }
 
-  const childSessionIds = anchor.child_session_ids ?? [];
-  if (contextSessionId !== rootSessionId && !childSessionIds.includes(contextSessionId)) {
-    childSessionIds.push(contextSessionId);
-  }
-
-  await writeFile(
-    file,
-    JSON.stringify(
-      {
-        version: 1,
-        root_session_id: rootSessionId,
-        child_session_ids: childSessionIds,
-        created_at: anchor.created_at ?? now,
-        updated_at: now,
-      },
-      null,
-      2,
-    ) + "\n",
-    "utf8",
-  );
-  return rootSessionId;
+  // No requestedSessionId, not root, not child → new conversation
+  const newAnchor: SessionAnchor = {
+    version: 1,
+    root_session_id: contextSessionId,
+    child_session_ids: [],
+    created_at: now,
+    updated_at: now,
+  };
+  await writeFile(file, JSON.stringify(newAnchor, null, 2) + "\n", "utf8");
+  return contextSessionId;
 }
 
 export async function assertSessionConsistent(worktree: string, sessionID: string) {

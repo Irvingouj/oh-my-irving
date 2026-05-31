@@ -147,221 +147,226 @@ describe("pipeline tools", () => {
     await rm(tmpDir, { recursive: true, force: true });
   });
 
-  describe("pipeline_init", () => {
-    it("creates state.json with correct structure", async () => {
-      const result = await tools.pipeline_init.execute({}, context);
-      const resultStr = result as string;
-      assert.ok(resultStr.includes("test-session"));
-      assert.ok(resultStr.includes(".opencode/irving/test-session/"));
-
-      const file = statePath(tmpDir, "test-session");
-      assert.strictEqual(existsSync(file), true);
-
-      const content = await readFile(file, "utf8");
-      const state = JSON.parse(content);
-      assert.strictEqual(state.version, 1);
-      assert.strictEqual(state.session_id, "test-session");
-      assert.strictEqual(state.phase, "init");
-      assert.strictEqual(state.planning.status, "not_started");
-      assert.strictEqual(state.planning.round, 0);
-      assert.strictEqual(state.execution.status, "not_started");
-      assert.strictEqual(state.execution.iteration, 0);
-      assert.strictEqual(state.execution.next_action, "continue");
-      assert.deepStrictEqual(state.execution.active_work_units, []);
-      assert.deepStrictEqual(state.execution.blocked_work_units, []);
-      assert.deepStrictEqual(state.execution.ignored_findings, []);
-      assert.deepStrictEqual(state.execution.evidence, []);
-    });
-
-    it("creates event log entry", async () => {
-      await tools.pipeline_init.execute({}, context);
-      const logPath = path.join(sessionDir(tmpDir, "test-session"), "logs", "events.jsonl");
-      assert.strictEqual(existsSync(logPath), true);
-      const content = await readFile(logPath, "utf8");
-      const lines = content.trim().split("\n");
-      assert.strictEqual(lines.length, 1);
-      const event = JSON.parse(lines[0]);
-      assert.strictEqual(event.type, "pipeline.init");
-      assert.ok(event.timestamp);
+  describe("irving_session", () => {
+    it("returns session info and creates dirs", async () => {
+      const result = await tools.irving_session.execute({}, context);
+      const parsed = JSON.parse(result as string);
+      assert.strictEqual(parsed.session_id, "test-session");
+      assert.ok(parsed.base_path.includes("test-session"));
+      assert.strictEqual(existsSync(statePath(tmpDir, "test-session")), false);
     });
   });
 
-  describe("pipeline_read_state", () => {
-    it("reads default state when file does not exist", async () => {
-      const result = await tools.pipeline_read_state.execute({ session_id: null }, context);
-      const state = JSON.parse(result as string);
-      assert.strictEqual(state.version, 1);
-      assert.strictEqual(state.session_id, "test-session");
-      assert.strictEqual(state.phase, "init");
+  describe("irving_status", () => {
+    it("returns state and null plan when no plan exists", async () => {
+      const result = await tools.irving_status.execute({}, context);
+      const parsed = JSON.parse(result as string);
+      assert.strictEqual(parsed.state.version, 1);
+      assert.strictEqual(parsed.state.phase, "init");
+      assert.strictEqual(parsed.plan, null);
     });
 
-    it("reads existing state file", async () => {
-      await tools.pipeline_init.execute({}, context);
-      await tools.pipeline_set_phase.execute({ session_id: null, phase: "execution" }, context);
+    it("returns plan after one is created", async () => {
+      await tools.irving_plan.execute({
+        objective: "Test",
+        criteria: "AC-1: Do something",
+        units: "wu-1: First unit",
+      }, context);
 
-      const result = await tools.pipeline_read_state.execute({ session_id: null }, context);
-      const state = JSON.parse(result as string);
-      assert.strictEqual(state.phase, "execution");
+      const result = await tools.irving_status.execute({}, context);
+      const parsed = JSON.parse(result as string);
+      assert.ok(parsed.plan);
+      assert.strictEqual(parsed.plan.objective, "Test");
     });
   });
 
-  describe("pipeline_set_phase", () => {
-    it("updates phase correctly", async () => {
-      await tools.pipeline_init.execute({}, context);
-      const result = await tools.pipeline_set_phase.execute({ session_id: null, phase: "planning" }, context);
+  describe("irving_advance", () => {
+    it("sets phase", async () => {
+      const result = await tools.irving_advance.execute({ to: "planning" }, context);
       assert.strictEqual(result, "Phase set to planning");
 
       const file = statePath(tmpDir, "test-session");
-      const content = await readFile(file, "utf8");
-      const state = JSON.parse(content);
+      const state = JSON.parse(await readFile(file, "utf8"));
       assert.strictEqual(state.phase, "planning");
     });
 
-    it("logs phase change event", async () => {
-      await tools.pipeline_init.execute({}, context);
-      await tools.pipeline_set_phase.execute({ session_id: null, phase: "discovery" }, context);
+    it("sets round via round:N syntax", async () => {
+      const result = await tools.irving_advance.execute({ to: "round:3" }, context);
+      assert.strictEqual(result, "Round set to 3");
 
-      const logPath = path.join(sessionDir(tmpDir, "test-session"), "logs", "events.jsonl");
-      const content = await readFile(logPath, "utf8");
-      const lines = content.trim().split("\n");
-      assert.ok(lines.length >= 2);
-      const event = JSON.parse(lines[lines.length - 1]);
-      assert.strictEqual(event.type, "pipeline.phase");
-      assert.strictEqual(event.phase, "discovery");
+      const file = statePath(tmpDir, "test-session");
+      const state = JSON.parse(await readFile(file, "utf8"));
+      assert.strictEqual(state.planning.round, 3);
+      assert.strictEqual(state.planning.status, "debating");
+    });
+
+    it("rejects unknown phase", async () => {
+      const result = await tools.irving_advance.execute({ to: "nonsense" }, context);
+      assert.ok((result as string).includes("Unknown phase"));
     });
   });
 
-  describe("pipeline_create_plan", () => {
-    it("creates plan.json with validation", async () => {
-      const plan = {
-        objective: "Test objective",
-        acceptance_criteria: [
-          { id: "ac-1", description: "First AC", status: "pending" },
-        ],
-        work_units: [
-          { id: "wu-1", description: "First WU", status: "pending", dependencies: [] },
-        ],
-      };
-
-      const result = await tools.pipeline_create_plan.execute(
-        { session_id: null, plan: JSON.stringify(plan) },
-        context,
-      );
-      const resultStr = result as string;
-      assert.ok(resultStr.includes("plan.json"));
+  describe("irving_plan", () => {
+    it("creates plan from simple strings", async () => {
+      const result = await tools.irving_plan.execute({
+        objective: "Build feature X",
+        criteria: "AC-1: It works\nAC-2: It is tested",
+        units: "wu-1: Implement X\nwu-2: Add tests (depends: wu-1)",
+      }, context);
+      assert.ok((result as string).includes("2 criteria"));
+      assert.ok((result as string).includes("2 work units"));
 
       const file = planPath(tmpDir, "test-session");
+      const plan = JSON.parse(await readFile(file, "utf8"));
+      assert.strictEqual(plan.objective, "Build feature X");
+      assert.strictEqual(plan.acceptance_criteria.length, 2);
+      assert.strictEqual(plan.acceptance_criteria[0].id, "AC-1");
+      assert.strictEqual(plan.acceptance_criteria[1].id, "AC-2");
+      assert.strictEqual(plan.work_units.length, 2);
+      assert.strictEqual(plan.work_units[0].id, "wu-1");
+      assert.deepStrictEqual(plan.work_units[0].dependencies, []);
+      assert.strictEqual(plan.work_units[1].id, "wu-2");
+      assert.deepStrictEqual(plan.work_units[1].dependencies, ["wu-1"]);
+    });
+
+    it("auto-generates IDs when colon missing", async () => {
+      await tools.irving_plan.execute({
+        objective: "Test",
+        criteria: "Just a description",
+        units: "Just a unit",
+      }, context);
+
+      const file = planPath(tmpDir, "test-session");
+      const plan = JSON.parse(await readFile(file, "utf8"));
+      assert.strictEqual(plan.acceptance_criteria.length, 1);
+      assert.ok(plan.acceptance_criteria[0].id);
+      assert.strictEqual(plan.work_units.length, 1);
+      assert.ok(plan.work_units[0].id);
+    });
+  });
+
+  describe("irving_work_unit", () => {
+    it("creates work unit file with YAML frontmatter", async () => {
+      const result = await tools.irving_work_unit.execute({
+        id: "wu-1",
+        title: "Do the thing",
+        body: "## Description\n\nDo it well.\n\n## Acceptance Criteria\n\n- [ ] Done",
+      }, context);
+      assert.strictEqual(result, "Created work unit wu-1");
+
+      const file = path.join(sessionDir(tmpDir, "test-session"), "work-units", "wu-1.md");
       assert.strictEqual(existsSync(file), true);
-
       const content = await readFile(file, "utf8");
-      const saved = JSON.parse(content);
-      assert.strictEqual(saved.objective, "Test objective");
-      assert.deepStrictEqual(saved.acceptance_criteria, plan.acceptance_criteria);
-      assert.deepStrictEqual(saved.work_units, plan.work_units);
-    });
-
-    it("throws for invalid plan", async () => {
-      const badPlan = { objective: "Test" }; // missing acceptance_criteria and work_units
-      await assert.rejects(
-        async () =>
-          await tools.pipeline_create_plan.execute(
-            { session_id: null, plan: JSON.stringify(badPlan) },
-            context,
-          ),
-        /Invalid plan/,
-      );
+      assert.ok(content.includes("id: wu-1"));
+      assert.ok(content.includes("title: \"Do the thing\""));
+      assert.ok(content.includes("Do it well"));
     });
   });
 
-  describe("pipeline_record_evidence", () => {
-    it("appends evidence correctly", async () => {
-      await tools.pipeline_init.execute({}, context);
-      const result = await tools.pipeline_record_evidence.execute(
-        { session_id: null, ac_id: "ac-1", type: "test", detail: "Tests pass" },
-        context,
-      );
-      assert.strictEqual(result, "Recorded evidence for ac-1");
+  describe("irving_delegate", () => {
+    it("sets active and blocked work units", async () => {
+      const result = await tools.irving_delegate.execute({
+        active: ["wu-1", "wu-2"],
+        blocked: ["wu-3"],
+      }, context);
+      assert.ok((result as string).includes("wu-1, wu-2"));
+      assert.ok((result as string).includes("wu-3"));
 
       const file = statePath(tmpDir, "test-session");
-      const content = await readFile(file, "utf8");
-      const state = JSON.parse(content);
+      const state = JSON.parse(await readFile(file, "utf8"));
+      assert.deepStrictEqual(state.execution.active_work_units, ["wu-1", "wu-2"]);
+      assert.deepStrictEqual(state.execution.blocked_work_units, ["wu-3"]);
+    });
+  });
+
+  describe("irving_evidence", () => {
+    it("records evidence without type arg", async () => {
+      const result = await tools.irving_evidence.execute({
+        ac_id: "AC-1",
+        detail: "Tests pass for login flow",
+      }, context);
+      assert.strictEqual(result, "Evidence recorded for AC-1");
+
+      const file = statePath(tmpDir, "test-session");
+      const state = JSON.parse(await readFile(file, "utf8"));
       assert.strictEqual(state.execution.evidence.length, 1);
-      assert.strictEqual(state.execution.evidence[0].ac_id, "ac-1");
-      assert.strictEqual(state.execution.evidence[0].type, "test");
-      assert.strictEqual(state.execution.evidence[0].detail, "Tests pass");
-    });
-
-    it("logs evidence event", async () => {
-      await tools.pipeline_init.execute({}, context);
-      await tools.pipeline_record_evidence.execute(
-        { session_id: null, ac_id: "ac-2", type: "manual", detail: "Verified" },
-        context,
-      );
-
-      const logPath = path.join(sessionDir(tmpDir, "test-session"), "logs", "events.jsonl");
-      const content = await readFile(logPath, "utf8");
-      const lines = content.trim().split("\n");
-      const event = JSON.parse(lines[lines.length - 1]);
-      assert.strictEqual(event.type, "pipeline.evidence");
-      assert.strictEqual(event.ac_id, "ac-2");
-      assert.strictEqual(event.evidence_type, "manual");
+      assert.strictEqual(state.execution.evidence[0].ac_id, "AC-1");
+      assert.strictEqual(state.execution.evidence[0].detail, "Tests pass for login flow");
     });
   });
 
-  describe("pipeline_set_next_action", () => {
-    it("sets next action and reason", async () => {
-      await tools.pipeline_init.execute({}, context);
-      const result = await tools.pipeline_set_next_action.execute(
-        { session_id: null, next_action: "needs_human", reason: "Waiting for approval" },
-        context,
-      );
-
-      const parsed = JSON.parse(result as string);
-      assert.strictEqual(parsed.next_action, "needs_human");
-      assert.strictEqual(parsed.reason, "Waiting for approval");
-      assert.strictEqual(parsed.blocking_question, null);
-      assert.strictEqual(parsed.iteration, 0);
+  describe("irving_skip", () => {
+    it("records skipped finding", async () => {
+      const result = await tools.irving_skip.execute({
+        finding_id: "F-1",
+        why: "Pre-existing issue not touched by this work unit",
+      }, context);
+      assert.strictEqual(result, "Skipped finding F-1");
 
       const file = statePath(tmpDir, "test-session");
+      const state = JSON.parse(await readFile(file, "utf8"));
+      assert.strictEqual(state.execution.ignored_findings.length, 1);
+      assert.strictEqual(state.execution.ignored_findings[0].finding_id, "F-1");
+    });
+  });
+
+  describe("irving_note", () => {
+    it("records a decision note", async () => {
+      const result = await tools.irving_note.execute({
+        kind: "decision",
+        text: "Chose option B because of X",
+      }, context);
+      assert.strictEqual(result, "Recorded decision note");
+    });
+
+    it("records human context and appends to debate file", async () => {
+      await tools.irving_advance.execute({ to: "round:1" }, context);
+      const result = await tools.irving_note.execute({
+        kind: "human_context",
+        text: "User wants it done by Friday",
+      }, context);
+      assert.strictEqual(result, "Recorded human_context note");
+
+      const file = path.join(sessionDir(tmpDir, "test-session"), "debate", "round-001-human.md");
+      assert.strictEqual(existsSync(file), true);
       const content = await readFile(file, "utf8");
-      const state = JSON.parse(content);
+      assert.ok(content.includes("User wants it done by Friday"));
+    });
+  });
+
+  describe("irving_next", () => {
+    it("sets next action and reason", async () => {
+      const result = await tools.irving_next.execute({
+        action: "needs_human",
+        why: "Waiting for approval",
+      }, context);
+      assert.ok((result as string).includes("needs_human"));
+
+      const file = statePath(tmpDir, "test-session");
+      const state = JSON.parse(await readFile(file, "utf8"));
       assert.strictEqual(state.execution.next_action, "needs_human");
       assert.strictEqual(state.execution.reason, "Waiting for approval");
-      assert.strictEqual(state.execution.blocking_question, null);
+      assert.strictEqual(state.execution.blocking_question, "Waiting for approval");
     });
 
-    it("sets blocking question when provided", async () => {
-      await tools.pipeline_init.execute({}, context);
-      await tools.pipeline_set_next_action.execute(
-        {
-          session_id: null,
-          next_action: "needs_human",
-          reason: "Need clarification",
-          blocking_question: "What should I do next?",
-        },
-        context,
-      );
+    it("defaults invalid action to needs_human", async () => {
+      const result = await tools.irving_next.execute({
+        action: "bogus",
+        why: "test",
+      }, context);
+      assert.ok((result as string).includes("needs_human"));
+    });
+
+    it("sets continue without blocking question", async () => {
+      await tools.irving_next.execute({
+        action: "continue",
+        why: "Keep going",
+      }, context);
 
       const file = statePath(tmpDir, "test-session");
-      const content = await readFile(file, "utf8");
-      const state = JSON.parse(content);
-      assert.strictEqual(state.execution.blocking_question, "What should I do next?");
-    });
-
-    it("logs next_action event", async () => {
-      await tools.pipeline_init.execute({}, context);
-      await tools.pipeline_set_next_action.execute(
-        { session_id: null, next_action: "continue", reason: "Keep going" },
-        context,
-      );
-
-      const logPath = path.join(sessionDir(tmpDir, "test-session"), "logs", "events.jsonl");
-      const content = await readFile(logPath, "utf8");
-      const lines = content.trim().split("\n");
-      const event = JSON.parse(lines[lines.length - 1]);
-      assert.strictEqual(event.type, "pipeline.next_action");
-      assert.strictEqual(event.next_action, "continue");
-      assert.strictEqual(event.reason, "Keep going");
+      const state = JSON.parse(await readFile(file, "utf8"));
+      assert.strictEqual(state.execution.next_action, "continue");
+      assert.strictEqual(state.execution.blocking_question, null);
     });
   });
 });
