@@ -9,6 +9,7 @@ import {
   debateDir,
 } from "./session.js";
 import { readStateFile, logEvent } from "./state.js";
+import { recordHumanReply } from "./tools.js";
 
 async function resolveGuardSessionId(worktree: string, sessionID?: string): Promise<string | undefined> {
   if (sessionID) return sessionID;
@@ -145,13 +146,19 @@ function checkAntiLoop(recent: ToolCall[], tool: string, args: Record<string, un
 }
 
 const AWAITING_HUMAN_MESSAGE = [
-  "[irving] HUMAN_REPLY_NOT_DETECTED!",
+  "[irving] BLOCKED — NO HUMAN REPLY DETECTED.",
   "",
-  "You are trying to approve/accept without a human reply since the last state transition.",
-  "YOU CANNOT MOVE FORWARD WITHOUT HUMAN REPLY.",
-  "STOP CALLING ANY TOOLS IMMEDIATELY.",
-  "STOP GENERATING JSON OR TOOL CALLS.",
-  "OUTPUT PLAIN TEXT TO THE HUMAN AND WAIT FOR THEIR REPLY.",
+  "You are trying to approve or accept without receiving a human reply since the last state transition.",
+  "YOU CANNOT MOVE FORWARD WITHOUT A HUMAN REPLY. THIS IS A HARD REQUIREMENT.",
+  "",
+  "DO NOT CALL ANY TOOLS.",
+  "DO NOT REPLY WITH ANY JSON OR TOOL CALLS.",
+  "DO NOT TRY irving_next WITH A DIFFERENT ACTION.",
+  "",
+  "IMMEDIATELY reply with this exact format:",
+  "'I HAVE TO STOP HERE! Because I tried to approve/accept the pipeline state, but no human has replied since the last state transition. I need explicit human approval before I can proceed.'",
+  "",
+  "Then wait for the human to reply. Do nothing else.",
 ].join("\n");
 
 export function createGuardHooks(worktree: string) {
@@ -246,7 +253,8 @@ export function createGuardHooks(worktree: string) {
       // Only react to user messages
       if (output.message.role !== "user") return;
 
-      // Increment human message counter
+      // Increment human message counter (shared with tool-level gate)
+      recordHumanReply(sessionId);
       const current = humanMessageCount.get(sessionId) ?? 0;
       humanMessageCount.set(sessionId, current + 1);
       await logEvent(worktree, sessionId, { type: "guard.human_reply_detected", count: current + 1 });

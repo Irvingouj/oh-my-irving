@@ -9,6 +9,7 @@ import {
   parseYamlFrontmatter,
   validateWorkUnitFrontmatter,
   createPipelineTools,
+  recordHumanReply,
 } from "./tools.js";
 import { sessionDir, statePath, planPath } from "./session.js";
 
@@ -388,14 +389,14 @@ describe("pipeline tools", () => {
     it("blocks irving_advance from non-orchestrator agent", async () => {
       await assert.rejects(
         async () => await tools.irving_advance.execute({ to: "planning" }, agentContext),
-        /restricted to orchestrator/,
+        /BLOCKED.*not the orchestrator/,
       );
     });
 
     it("blocks irving_next from non-orchestrator agent", async () => {
       await assert.rejects(
         async () => await tools.irving_next.execute({ action: "continue", why: "test" }, agentContext),
-        /restricted to orchestrator/,
+        /BLOCKED.*not the orchestrator/,
       );
     });
 
@@ -409,6 +410,152 @@ describe("pipeline tools", () => {
       const result = await tools.irving_session.execute({}, agentContext);
       const parsed = JSON.parse(result as string);
       assert.ok(parsed.session_id);
+    });
+
+    it("escalates non-orchestrator message on repeated attempts", async () => {
+      const escalationCtx = mockContext("escalation-test-session", "implementer");
+      // First attempt: standard denial
+      await assert.rejects(
+        async () => await tools.irving_next.execute({ action: "continue", why: "test" }, escalationCtx),
+        /BLOCKED/,
+      );
+      // Second attempt: escalated
+      await assert.rejects(
+        async () => await tools.irving_next.execute({ action: "continue", why: "test" }, escalationCtx),
+        /SECOND BLOCK/,
+      );
+      // Third attempt: final warning
+      await assert.rejects(
+        async () => await tools.irving_next.execute({ action: "continue", why: "test" }, escalationCtx),
+        /FINAL BLOCK/,
+      );
+    });
+  });
+
+  describe("in-tool anti-loop detection", () => {
+    let tmpDir: string;
+    let tools: ReturnType<typeof createPipelineTools>;
+    let counter = 0;
+
+    beforeEach(async () => {
+      counter++;
+      tmpDir = await mkdtemp(path.join(tmpdir(), "irving-tool-antiloop-"));
+      tools = createPipelineTools(tmpDir);
+    });
+
+    afterEach(async () => {
+      await rm(tmpDir, { recursive: true, force: true });
+    });
+
+    it("allows first irving_next call", async () => {
+      const ctx = mockContext(`antiloop-${counter}-a`);
+      const result = await tools.irving_next.execute({
+        action: "continue",
+        why: "keep going",
+      }, ctx);
+      assert.ok((result as string).includes("continue"));
+    });
+
+    it("blocks identical irving_next on 2nd call", async () => {
+      const ctx = mockContext(`antiloop-${counter}-b`);
+      await tools.irving_next.execute({ action: "continue", why: "keep going" }, ctx);
+      await assert.rejects(
+        async () => await tools.irving_next.execute({ action: "continue", why: "keep going" }, ctx),
+        /anti-loop.*BLOCKED/,
+      );
+    });
+
+    it("escalates message on 3rd identical call", async () => {
+      const ctx = mockContext(`antiloop-${counter}-c`);
+      await tools.irving_next.execute({ action: "continue", why: "keep going" }, ctx);
+      try { await tools.irving_next.execute({ action: "continue", why: "keep going" }, ctx); } catch {}
+      await assert.rejects(
+        async () => await tools.irving_next.execute({ action: "continue", why: "keep going" }, ctx),
+        /SECOND BLOCK/,
+      );
+    });
+
+    it("allows different args after identical block", async () => {
+      const ctx = mockContext(`antiloop-${counter}-d`);
+      await tools.irving_next.execute({ action: "continue", why: "first" }, ctx);
+      // Different args should pass
+      await tools.irving_next.execute({ action: "blocked", why: "wait" }, ctx);
+    });
+
+    it("blocks identical irving_advance on 2nd call", async () => {
+      const ctx = mockContext(`antiloop-${counter}-e`);
+      await tools.irving_advance.execute({ to: "planning" }, ctx);
+      await assert.rejects(
+        async () => await tools.irving_advance.execute({ to: "planning" }, ctx),
+        /anti-loop.*BLOCKED/,
+      );
+    });
+  });
+
+  describe("in-tool human reply gate", () => {
+    let tmpDir: string;
+    let tools: ReturnType<typeof createPipelineTools>;
+    let counter = 0;
+
+    beforeEach(async () => {
+      counter++;
+      tmpDir = await mkdtemp(path.join(tmpdir(), "irving-tool-humangate-"));
+      tools = createPipelineTools(tmpDir);
+    });
+
+    afterEach(async () => {
+      await rm(tmpDir, { recursive: true, force: true });
+    });
+
+    it("blocks irving_next(accepted) without human reply", async () => {
+      const ctx = mockContext(`humangate-${counter}-a`);
+      await assert.rejects(
+        async () => await tools.irving_next.execute({ action: "accepted", why: "done" }, ctx),
+        /BLOCKED.*NO HUMAN REPLY/,
+      );
+    });
+
+    it("allows irving_next(accepted) after recordHumanReply", async () => {
+      const sid = `humangate-${counter}-b`;
+      recordHumanReply(sid);
+      const ctx = mockContext(sid);
+      await tools.irving_next.execute({ action: "accepted", why: "done" }, ctx);
+    });
+
+    it("blocks second accepted without another human reply", async () => {
+      const sid = `humangate-${counter}-c`;
+      recordHumanReply(sid);
+      const ctx = mockContext(sid);
+      await tools.irving_next.execute({ action: "accepted", why: "first" }, ctx);
+      await assert.rejects(
+        async () => await tools.irving_next.execute({ action: "accepted", why: "second" }, ctx),
+        /BLOCKED.*NO HUMAN REPLY/,
+      );
+    });
+
+    it("allows irving_next(continue) without human reply", async () => {
+      const ctx = mockContext(`humangate-${counter}-d`);
+      await tools.irving_next.execute({ action: "continue", why: "keep going" }, ctx);
+    });
+
+    it("allows irving_next(blocked) without human reply", async () => {
+      const ctx = mockContext(`humangate-${counter}-e`);
+      await tools.irving_next.execute({ action: "blocked", why: "waiting" }, ctx);
+    });
+
+    it("blocks irving_advance(accepted) without human reply", async () => {
+      const ctx = mockContext(`humangate-${counter}-f`);
+      await assert.rejects(
+        async () => await tools.irving_advance.execute({ to: "accepted" }, ctx),
+        /BLOCKED.*NO HUMAN REPLY/,
+      );
+    });
+
+    it("allows irving_advance(accepted) after recordHumanReply", async () => {
+      const sid = `humangate-${counter}-g`;
+      recordHumanReply(sid);
+      const ctx = mockContext(sid);
+      await tools.irving_advance.execute({ to: "accepted" }, ctx);
     });
   });
 });

@@ -267,7 +267,7 @@ describe("createGuardHooks", () => {
             { tool: "irving_next", sessionID: "ses-1", callID: "call-1" },
             { args: { action: "accepted", why: "done" } },
           ),
-          /HUMAN_REPLY_NOT_DETECTED/,
+          /BLOCKED.*NO HUMAN REPLY/,
         );
       });
 
@@ -302,7 +302,7 @@ describe("createGuardHooks", () => {
             { tool: "irving_next", sessionID: "ses-2", callID: "call-2" },
             { args: { action: "accepted", why: "done again" } },
           ),
-          /HUMAN_REPLY_NOT_DETECTED/,
+          /BLOCKED.*NO HUMAN REPLY/,
         );
       });
 
@@ -345,7 +345,7 @@ describe("createGuardHooks", () => {
             { tool: "irving_next", sessionID: "ses-5", callID: "call-1" },
             { args: { action: "accepted", why: "done" } },
           ),
-          /HUMAN_REPLY_NOT_DETECTED/,
+          /BLOCKED.*NO HUMAN REPLY/,
         );
       });
 
