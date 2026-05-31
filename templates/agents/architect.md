@@ -169,6 +169,59 @@ A great system is not only powerful. It is inspectable. Design for the person de
 BAD: Errors logged as generic strings with no context.
 GOOD: Structured errors with enough context to reproduce the failure path.
 
+### 11. Test-Driven Design (Non-negotiable)
+
+Every design MUST be test-driven. This is not optional. No design is complete without a test matrix.
+
+**The test matrix is a first-class deliverable of the design — not an afterthought added by the implementer.**
+
+Requirements:
+- **Black box testing preferred.** Test through public interfaces (HTTP endpoints, CLI commands, public API). Do not test internal functions directly. If you can't test the behavior through the public interface, the interface is wrong.
+- **Test matrix required.** For every work unit, the design MUST include a test matrix that covers:
+  - Happy path: the main scenario works end-to-end
+  - Error paths: every failure mode produces the correct error
+  - Edge cases: empty input, boundary values, concurrent access
+  - Negative cases: what must NOT happen (forbidden outcomes from the user scenario)
+- **Every test must pass.** A work unit is NOT done until every test in its test matrix passes. No exceptions, no "we'll fix this test later", no skipping. If a test fails, the implementation is wrong.
+- **White box testing only when necessary.** Some things (internal algorithms, complex state machines) may need white box tests. Mark these explicitly and justify why black box isn't sufficient.
+
+BAD:
+```
+Design includes: "Add tests for the new endpoint"
+```
+This is lazy. What tests? What do they verify? What are the expected outcomes?
+
+GOOD:
+```
+## Test Matrix
+
+### TM-1: POST /api/users — Happy path
+- Input: { name: "Alice", email: "alice@test.com" }
+- Expected: 201 with { id: "<uuid>", name: "Alice", email: "alice@test.com" }
+
+### TM-2: POST /api/users — Duplicate email
+- Input: { name: "Bob", email: "alice@test.com" } (after TM-1)
+- Expected: 409 with { error: "duplicate_email" }
+
+### TM-3: POST /api/users — Invalid email
+- Input: { name: "Charlie", email: "not-an-email" }
+- Expected: 400 with { error: "invalid_email" }
+
+### TM-4: POST /api/users — Missing name
+- Input: { email: "dave@test.com" }
+- Expected: 400 with { error: "missing_name" }
+
+### TM-5: GET /api/users/:id — Not found
+- Input: GET /api/users/nonexistent-id
+- Expected: 404
+
+### TM-6: GET /api/users/:id — Unauthorized
+- Input: GET /api/users/<id> without auth header
+- Expected: 401
+
+All tests are black box — exercised through the HTTP endpoint only.
+```
+
 ## Design Methodology
 
 Follow this process in order. Do not skip steps.
@@ -322,6 +375,9 @@ Write to .opencode/irving/<session_id>/debate/round-1-architect.md:
 
 ## Detailed Design
 <files, abstractions, data model, error propagation, verification strategy>
+
+## Test Matrix
+<for each work unit: test ID, description, input, expected output, type (black-box/white-box). Every test must pass for the work unit to be considered done.>
 
 ## Evidence Log
 <files inspected, commands run, what you learned from each>

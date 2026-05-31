@@ -152,6 +152,28 @@ describe("review-fixer agent template", () => {
     const content = await readTemplate("agents", "review-fixer.md");
     assert.ok(content.includes("fix-<ROUND>"), "Should write fix report with round number");
   });
+});
+
+describe("architect agent template", () => {
+  it("requires TDD with test matrix", async () => {
+    const content = await readTemplate("agents", "architect.md");
+    assert.ok(content.includes("Test-Driven Design"), "Should mention test-driven design");
+    assert.ok(content.includes("Test Matrix"), "Should require test matrix");
+    assert.ok(content.includes("Black box testing preferred"), "Should prefer black box testing");
+    assert.ok(content.includes("Non-negotiable"), "Should mark TDD as non-negotiable");
+  });
+
+  it("requires every test to pass", async () => {
+    const content = await readTemplate("agents", "architect.md");
+    assert.ok(content.includes("Every test must pass"), "Should require all tests to pass");
+    assert.ok(content.includes("NOT done until every test"), "Should be clear about completion criteria");
+  });
+
+  it("includes test matrix in output format", async () => {
+    const content = await readTemplate("agents", "architect.md");
+    assert.ok(content.includes("## Test Matrix"), "Should have test matrix section in output format");
+  });
+});
 
 describe("completeness reviewer template", () => {
   it("exists and has required structure", async () => {
@@ -173,5 +195,4 @@ describe("completeness reviewer template", () => {
     assert.ok(content.includes("Missing branches"), "Should check for missing branches");
     assert.ok(content.includes("Missing wiring"), "Should check for missing wiring");
   });
-});
 });
