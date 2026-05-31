@@ -282,6 +282,10 @@ After evaluating all findings:
 - **Round 3 with only major (not blocker) findings** → consider accepting. Only blocker findings justify a round 4.
 - **Findings reveal the plan is flawed** → set next_action = blocked with the specific problem. Do not silently replan.
 
+### Expensive Reviewer REVISE
+
+If the expensive reviewer returns REVISE with "user goal not delivered", this overrides all previous review results. Send the ENTIRE implementation back through the fixer → reviewer loop. This is not optional — it means the individual WUs passed their checks but the whole doesn't work. Create a new fix round covering all affected WUs with the specific integration/gap issues from the expensive review.
+
 ## Evidence Standard
 
 Not all evidence is equal. Classify what you accept:

@@ -46,16 +46,29 @@ Do NOT read:
 
 ## What You Check
 
-### 1. Product Goal Delivery
+**CHECK #0 IS THE GATE. If it fails, everything else is irrelevant. Do it FIRST.**
 
-Read the original user goal from the context pack. Now look at the full git diff.
+### 0. Is the User's Goal ACTUALLY Delivered? (GATE CHECK)
 
-**Does the complete implementation actually deliver what the user asked for?**
+Before checking anything else, read ALL context:
 
-This is not about individual ACs. It's about the user scenario:
-> <Who> wanted to <do what> on <what resource>; should see/change <allowed outcome>; must not see/change <forbidden outcome>.
+1. **Read the original user goal** from context-pack.md — what the human actually asked for
+2. **Read the plan** from plan.json — the objective, every AC, every work unit
+3. **Read the debate** from debate/ — the design decisions, the tradeoffs, the human input
+4. **Read the full git diff** — what was actually changed
 
-Walk through that scenario end-to-end against the actual code. Does it work? Not "does each WU do its part" — does the WHOLE flow work from the user's perspective?
+Now answer this question honestly:
+
+> **If the user sat down and tried to do what they asked for, would it work?**
+
+Not "does each AC have a checkmark." Not "did each WU complete." Not "do tests pass."
+**Does the actual code, running on the actual system, deliver the user's original request?**
+
+Walk through the user scenario end-to-end against the actual code. Not summaries — read the actual implementation. Trace the flow from entry point to outcome.
+
+**FAILURE = REVISE. Not "accept with concerns." Not "note for future." REVISE.**
+
+If the user's goal is not delivered, everything else — ACs, evidence, reviews — is theater. The orchestrator must send the entire implementation back through the fixer → reviewer loop until this check passes.
 
 BAD:
 ```
@@ -67,7 +80,15 @@ WU-3: Added password update logic ✓
 But: WU-1 sends a generic email. WU-2 generates a token but doesn't include it in
 the email. WU-3 accepts the token but the user has no way to receive it.
 Each WU works in isolation. The user flow is broken.
+
+VERDICT: REVISE — user goal NOT delivered despite all WUs "complete"
 ```
+
+**Only proceed to checks 1-7 if this gate passes.**
+
+### 1. Product Goal Delivery (DETAILED TRACE)
+
+If the gate check passes, now do a detailed trace.
 
 ### 2. Cross-Work-Unit Integration
 
@@ -191,6 +212,9 @@ Write .opencode/irving/<session_id>/reviews/final-review.md:
 
 ```markdown
 # Final Review
+
+## Gate Check: Is the User's Goal ACTUALLY Delivered?
+<YES or NO. If NO → REVISE immediately with specific gaps. Everything below is secondary.>
 
 ## User Scenario Trace
 <walk through the user's scenario against the actual implementation, step by step>
