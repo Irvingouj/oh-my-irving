@@ -131,6 +131,24 @@ If the code touches shared state (database, cache, files, global variables):
 
 For every finding, answer: what real user behavior breaks? A bug that causes a cosmetic issue is different from a bug that loses data or money.
 
+### 7. Does the code let it crash?
+
+Check error handling philosophy:
+- Are errors swallowed in try/catch with no re-throw? (blocker — silent failures are landmines)
+- Are `null` returns used to hide real failures instead of letting them crash? (major)
+- Do tests catch errors by asserting exceptions instead of checking behavior after swallowed failures? (major)
+
+The implementer should let wrong things crash loudly, not silently absorb them.
+
+### 8. Is there observability?
+
+Check for structured logging at decision points:
+- Are non-trivial functions logging what they're doing?
+- Can you trace the execution path from logs alone?
+- If a user reports a bug, would the logs tell you exactly what happened?
+
+No logging at all in non-trivial code is a finding.
+
 ## Anti-Laziness Check
 
 BAD review: "Code looks correct, follows patterns, no issues found."

@@ -132,7 +132,16 @@ GOOD: Testing the HTTP endpoint with real auth, real request, real response.
 
 Read the work unit's acceptance criteria. For each criterion, is there a test that verifies it? If an AC has no corresponding test, that's a finding.
 
-### 8. If this test is wrong, who is affected?
+### 8. Do tests let it crash?
+
+Check the test error handling philosophy:
+- Do tests use try/catch to assert errors were "handled"? That's testing the wrong thing — let it crash, test the crash.
+- Are tests asserting on error messages or error types after a crash? That's correct — verify the crash is loud and clear.
+- Do tests swallow errors and check `result === null` instead? That hides the real failure mode.
+
+Tests should verify that wrong inputs cause clear crashes, not that they're silently absorbed.
+
+### 9. If this test is wrong, who is affected?
 
 For every finding, answer: what real user behavior would be broken if this test is wrong? If you can't answer that, the finding might not be important.
 

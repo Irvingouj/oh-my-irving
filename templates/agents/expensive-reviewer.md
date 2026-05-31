@@ -130,6 +130,16 @@ Look at the full diff for obvious regressions that might have slipped through:
 
 This is a light scan, not a full review. Trust the specialized reviewers for depth.
 
+### 7. Cross-Cutting Principles
+
+Quick scan for violations of core principles across the full diff:
+
+- **Correctness over everything**: Any `unknown` surviving past a parse boundary? Any `any`? If the domain needed 10 enum variants and got 2, that's a gap.
+- **Let it crash**: Are errors being swallowed in try/catch blocks? Is `null` returned to hide failures? Any silent error absorption?
+- **Observability**: Can you trace the execution path from logs alone? Are there decision points with no logging? Non-trivial functions with no trace?
+
+If any reviewer should have caught these but didn't, note it — it's a grey zone finding.
+
 ## What You Do NOT Check
 
 - Individual work unit correctness (correctness reviewer did this)

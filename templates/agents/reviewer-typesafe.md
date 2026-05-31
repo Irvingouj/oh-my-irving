@@ -48,7 +48,7 @@ Do NOT read:
 
 These rules are absolute — flag any violation as **blocker**:
 
-- **Minimize `unknown`.** Use generics over `unknown` wherever possible. If a function accepts `unknown`, ask: could this be a generic `<T>` instead?
+- **`unknown` is forbidden outside parse boundaries.** The ONLY place `unknown` is acceptable is at the edge of the system — parsing raw external input into a known type. Any `unknown` that survives past a parse function is a blocker. If the domain has 1000 states, create 1000 enum variants. There is no shortcut — no `unknown`, no `any`, no lazy type escapes.
 - **`any` and `object` are strictly forbidden.** No exceptions. Not in casts, not in parameters, not in returns. If you see `any` or bare `object`, it's a blocker.
 - **No type assertions unless 100% certain.** `as SomeType` is only acceptable when the shape is guaranteed by construction (e.g., after a parse function that returned `Result<SomeType>`). If there's any doubt, it's a finding.
 - **`as unknown as X` is banned.** No double-cast gymnantics. If you need this, the types are wrong — fix the types.
@@ -204,6 +204,13 @@ BAD:
 ```
 
 GOOD: The type system makes this impossible to construct.
+
+### 9. Observability types
+
+Check: Are log/trace events typed, or are they loose strings?
+- Log payloads should use structured objects, not string concatenation
+- Error types should be ADTs with context, not `Error("something failed")`
+- If there's a logger, its input should be typed — not `logger.log(anything)`
 
 ## Output
 
