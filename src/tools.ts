@@ -76,6 +76,16 @@ async function autoSessionId(worktree: string, context: ToolContext): Promise<st
   return await currentSessionId(worktree, context);
 }
 
+function requireOrchestrator(context: ToolContext): void {
+  if (context.agent && context.agent !== "orchestrator") {
+    throw new Error(
+      `[irving] Tool restricted to orchestrator agent. Current agent: "${context.agent}". ` +
+      `Only the orchestrator can transition pipeline state. ` +
+      `If you need to record findings or change state, report them in your output file and let the orchestrator handle it.`,
+    );
+  }
+}
+
 function parseLines(raw: string): string[] {
   return raw.split("\n").map(l => l.trim()).filter(Boolean);
 }
@@ -117,6 +127,7 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
         to: tool.schema.string().describe("Target phase or round:N"),
       },
       async execute(args, context) {
+        requireOrchestrator(context);
         const sessionId = await autoSessionId(worktree, context);
         const state = await readStateFile(worktree, sessionId);
         const target = args.to;
@@ -149,6 +160,7 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
         units: tool.schema.string().describe("Work units, one per line: wu-1: description (depends: wu-0)"),
       },
       async execute(args, context) {
+        requireOrchestrator(context);
         const sessionId = await autoSessionId(worktree, context);
         await ensureDirs(worktree, sessionId);
 
@@ -183,6 +195,7 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
         body: tool.schema.string().describe("Description and acceptance criteria"),
       },
       async execute(args, context) {
+        requireOrchestrator(context);
         const sessionId = await autoSessionId(worktree, context);
         await ensureDirs(worktree, sessionId);
         const content = `---\nid: ${args.id}\ntitle: "${args.title}"\nstatus: pending\ndependencies: []\n---\n\n${args.body}`;
@@ -205,6 +218,7 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
         blocked: tool.schema.array(tool.schema.string()).describe("Work unit IDs that are blocked"),
       },
       async execute(args, context) {
+        requireOrchestrator(context);
         const sessionId = await autoSessionId(worktree, context);
         const state = await readStateFile(worktree, sessionId);
         state.execution.active_work_units = args.active;
@@ -222,6 +236,7 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
         detail: tool.schema.string().describe("What was verified and how"),
       },
       async execute(args, context) {
+        requireOrchestrator(context);
         const sessionId = await autoSessionId(worktree, context);
         const state = await readStateFile(worktree, sessionId);
         state.execution.evidence.push({ ac_id: args.ac_id, type: "review", detail: args.detail });
@@ -238,6 +253,7 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
         why: tool.schema.string().describe("Why this finding is being ignored"),
       },
       async execute(args, context) {
+        requireOrchestrator(context);
         const sessionId = await autoSessionId(worktree, context);
         const state = await readStateFile(worktree, sessionId);
         state.execution.ignored_findings.push({ finding_id: args.finding_id, reason: args.why });
@@ -254,6 +270,7 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
         text: tool.schema.string().describe("The note content"),
       },
       async execute(args, context) {
+        requireOrchestrator(context);
         const sessionId = await autoSessionId(worktree, context);
         await ensureDirs(worktree, sessionId);
         if (args.kind === "human_context") {
@@ -273,6 +290,7 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
         why: tool.schema.string().describe("One sentence explaining why"),
       },
       async execute(args, context) {
+        requireOrchestrator(context);
         const sessionId = await autoSessionId(worktree, context);
         const state = await readStateFile(worktree, sessionId);
         const valid = ["continue", "needs_human", "ready_for_final_review", "accepted", "blocked", "failed"];

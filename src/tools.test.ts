@@ -12,11 +12,11 @@ import {
 } from "./tools.js";
 import { sessionDir, statePath, planPath } from "./session.js";
 
-function mockContext(sessionID: string): ToolContext {
+function mockContext(sessionID: string, agent = "orchestrator"): ToolContext {
   return {
     sessionID,
     messageID: "msg-1",
-    agent: "test-agent",
+    agent,
     directory: "/tmp",
     worktree: "/tmp",
     abort: new AbortController().signal,
@@ -367,6 +367,48 @@ describe("pipeline tools", () => {
       const state = JSON.parse(await readFile(file, "utf8"));
       assert.strictEqual(state.execution.next_action, "continue");
       assert.strictEqual(state.execution.blocking_question, null);
+    });
+  });
+
+  describe("orchestrator-only restriction", () => {
+    let tmpDir: string;
+    let tools: ReturnType<typeof createPipelineTools>;
+    let agentContext: ToolContext;
+
+    beforeEach(async () => {
+      tmpDir = await mkdtemp(path.join(tmpdir(), "irving-tools-test-"));
+      tools = createPipelineTools(tmpDir);
+      agentContext = mockContext("test-session", "implementer");
+    });
+
+    afterEach(async () => {
+      await rm(tmpDir, { recursive: true, force: true });
+    });
+
+    it("blocks irving_advance from non-orchestrator agent", async () => {
+      await assert.rejects(
+        async () => await tools.irving_advance.execute({ to: "planning" }, agentContext),
+        /restricted to orchestrator/,
+      );
+    });
+
+    it("blocks irving_next from non-orchestrator agent", async () => {
+      await assert.rejects(
+        async () => await tools.irving_next.execute({ action: "continue", why: "test" }, agentContext),
+        /restricted to orchestrator/,
+      );
+    });
+
+    it("allows irving_status from non-orchestrator agent", async () => {
+      const result = await tools.irving_status.execute({}, agentContext);
+      const parsed = JSON.parse(result as string);
+      assert.strictEqual(parsed.state.version, 1);
+    });
+
+    it("allows irving_session from non-orchestrator agent", async () => {
+      const result = await tools.irving_session.execute({}, agentContext);
+      const parsed = JSON.parse(result as string);
+      assert.ok(parsed.session_id);
     });
   });
 });
