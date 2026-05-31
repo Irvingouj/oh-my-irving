@@ -197,17 +197,17 @@ describe("createGuardHooks", () => {
       }
     });
 
-    it("blocks same tool with different args after 4 consecutive calls", async () => {
-      for (let i = 0; i < 4; i++) {
+    it("blocks same tool with different args after 20 consecutive calls", async () => {
+      for (let i = 0; i < 20; i++) {
         await hooks["tool.execute.before"](
           { tool: "irving_next", sessionID: "ses-1", callID: `call-${i}` },
           { args: { action: `action-${i}`, why: `reason-${i}` } },
         );
       }
-      // 5th same-tool call should be blocked with graduated message
+      // 21st same-tool call should be blocked with graduated message
       await assert.rejects(
         async () => await hooks["tool.execute.before"](
-          { tool: "irving_next", sessionID: "ses-1", callID: "call-5" },
+          { tool: "irving_next", sessionID: "ses-1", callID: "call-21" },
           { args: { action: "yet-another", why: "still going" } },
         ),
         /\[anti-loop\]/,

@@ -29,9 +29,9 @@ function isProtectedFile(filePath: string): boolean {
 
 // --- Anti-loop detection ---
 
-const WINDOW_SIZE = 8;
+const WINDOW_SIZE = 24;
 const SAME_TOOL_AND_ARGS_LIMIT = 3;
-const SAME_TOOL_LIMIT = 4;
+const SAME_TOOL_LIMIT = 20;
 const SAME_TOOL_WHITELIST = new Set(["bash", "read", "write", "edit", "glob", "grep", "list"]);
 
 type ToolCall = { tool: string; argsHash: string };
