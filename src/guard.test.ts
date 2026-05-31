@@ -66,6 +66,40 @@ describe("createGuardHooks", () => {
     assert.ok(event.timestamp);
   });
 
+  it("event hook registers child session only from explicit parentID", async () => {
+    const input = { tool: "read", sessionID: "root-ses", callID: "call-root" };
+    await hooks["tool.execute.before"](input, { args: { filePath: "/some/file.txt" } });
+
+    await hooks.event({
+      event: {
+        type: "session.created",
+        properties: {
+          sessionID: "child-ses",
+          info: { parentID: "root-ses" },
+        },
+      },
+    });
+
+    const anchor = JSON.parse(await readFile(sessionAnchorPath(tmpDir), "utf8"));
+    assert.strictEqual(anchor.root_session_id, "root-ses");
+    assert.deepStrictEqual(anchor.child_session_ids, ["child-ses"]);
+  });
+
+  it("tool.execute.before does not make a new top-level session a child of the old root", async () => {
+    await hooks["tool.execute.before"](
+      { tool: "read", sessionID: "old-root", callID: "call-old" },
+      { args: { filePath: "/some/file.txt" } },
+    );
+    await hooks["tool.execute.before"](
+      { tool: "read", sessionID: "new-root", callID: "call-new" },
+      { args: { filePath: "/some/other-file.txt" } },
+    );
+
+    const anchor = JSON.parse(await readFile(sessionAnchorPath(tmpDir), "utf8"));
+    assert.strictEqual(anchor.root_session_id, "old-root");
+    assert.deepStrictEqual(anchor.child_session_ids, []);
+  });
+
   it("event hook falls back to anchor root_session_id when no session_id in event", async () => {
     const anchorDir = path.join(tmpDir, ".opencode", "irving");
     await mkdir(anchorDir, { recursive: true });
