@@ -1,7 +1,7 @@
 ---
 description: LLM orchestrator that delegates dependent implementation work until acceptance criteria pass
 mode: primary
-temperature: 0.1
+temperature: 0.15
 permission:
   edit: allow
   bash:
