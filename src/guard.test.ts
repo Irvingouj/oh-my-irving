@@ -125,4 +125,81 @@ describe("createGuardHooks", () => {
       /Modify state\.json through pipeline_\* tools only\./,
     );
   });
+
+  describe("anti-loop detection", () => {
+    it("allows first call to any tool", async () => {
+      const input = { tool: "irving_next", sessionID: "ses-1", callID: "call-1" };
+      const output = { args: { action: "needs_human", why: "test" } };
+      // Should not throw
+      await hooks["tool.execute.before"](input, output);
+    });
+
+    it("blocks same tool with identical args after 2 calls", async () => {
+      const args = { action: "needs_human", why: "Waiting for input" };
+      for (let i = 0; i < 2; i++) {
+        await hooks["tool.execute.before"](
+          { tool: "irving_next", sessionID: "ses-1", callID: `call-${i}` },
+          { args },
+        );
+      }
+      // 3rd identical call should be blocked
+      await assert.rejects(
+        async () => await hooks["tool.execute.before"](
+          { tool: "irving_next", sessionID: "ses-1", callID: "call-3" },
+          { args },
+        ),
+        /\[anti-loop\] Repeated identical tool call/,
+      );
+    });
+
+    it("allows same tool with different args", async () => {
+      const input = (action: string) => ({
+        tool: "irving_next",
+        sessionID: "ses-1",
+        callID: `call-${action}`,
+      });
+      // Different args each time — should all pass
+      for (const action of ["continue", "needs_human", "continue", "blocked"]) {
+        await hooks["tool.execute.before"](input(action), { args: { action, why: action } });
+      }
+    });
+
+    it("blocks same tool with different args after 4 consecutive calls", async () => {
+      for (let i = 0; i < 4; i++) {
+        await hooks["tool.execute.before"](
+          { tool: "irving_next", sessionID: "ses-1", callID: `call-${i}` },
+          { args: { action: `action-${i}`, why: `reason-${i}` } },
+        );
+      }
+      // 5th same-tool call should be blocked
+      await assert.rejects(
+        async () => await hooks["tool.execute.before"](
+          { tool: "irving_next", sessionID: "ses-1", callID: "call-5" },
+          { args: { action: "yet-another", why: "still going" } },
+        ),
+        /\[anti-loop\] Possible tool-use loop/,
+      );
+    });
+
+    it("resets counter when a different tool is used", async () => {
+      const args = { action: "needs_human", why: "waiting" };
+      // 2 identical calls
+      for (let i = 0; i < 2; i++) {
+        await hooks["tool.execute.before"](
+          { tool: "irving_next", sessionID: "ses-1", callID: `call-${i}` },
+          { args },
+        );
+      }
+      // Different tool resets the streak
+      await hooks["tool.execute.before"](
+        { tool: "irving_status", sessionID: "ses-1", callID: "call-break" },
+        { args: {} },
+      );
+      // Now irving_next with same args should be allowed again
+      await hooks["tool.execute.before"](
+        { tool: "irving_next", sessionID: "ses-1", callID: "call-after" },
+        { args },
+      );
+    });
+  });
 });
