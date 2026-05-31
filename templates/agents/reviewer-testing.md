@@ -36,11 +36,11 @@ Read:
 - .opencode/irving/<session_id>/reports/<WORK_UNIT_ID>-impl.md — the implementer's report
 - All test files added or modified by this work unit
 - The actual source files being tested
+- .opencode/irving/<session_id>/debate/ — architect/skeptic debate and human input that shaped design decisions
 
 Do NOT read:
 - .opencode/irving/<session_id>/context-pack.md
 - .opencode/irving/<session_id>/state.json
-- .opencode/irving/<session_id>/debate/**
 - .opencode/irving/<session_id>/reviews/** from other work units
 
 ## Preamble: What Are Tests For

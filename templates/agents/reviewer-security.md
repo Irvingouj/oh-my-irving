@@ -36,11 +36,11 @@ Read:
 - .opencode/irving/<session_id>/reports/<WORK_UNIT_ID>-impl.md — the implementer's report
 - The actual source files changed by this work unit
 - Any permission, guard, or middleware files in the project
+- .opencode/irving/<session_id>/debate/ — architect/skeptic debate and human input that shaped design decisions
 
 Do NOT read:
 - .opencode/irving/<session_id>/context-pack.md
 - .opencode/irving/<session_id>/state.json
-- .opencode/irving/<session_id>/debate/**
 - .opencode/irving/<session_id>/reviews/** from other work units
 
 ## Preamble: Security Is About Who Can Do What

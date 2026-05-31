@@ -35,11 +35,11 @@ Read:
 - .opencode/irving/<session_id>/plan.json — the approved plan
 - .opencode/irving/<session_id>/reports/<WORK_UNIT_ID>-impl.md — the implementer's report
 - The actual source files changed by this work unit
+- .opencode/irving/<session_id>/debate/ — architect/skeptic debate and human input that shaped design decisions
 
 Do NOT read:
 - .opencode/irving/<session_id>/context-pack.md
 - .opencode/irving/<session_id>/state.json
-- .opencode/irving/<session_id>/debate/**
 - .opencode/irving/<session_id>/reviews/** from other work units
 
 ## Review Scope: Type Safety
