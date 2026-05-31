@@ -104,4 +104,34 @@ describe("orchestrator agent template", () => {
       "Should check planning.status in one iteration"
     );
   });
+
+  it("mentions review-fixer for subsequent rounds", async () => {
+    const content = await readTemplate("agents", "orchestrator.md");
+    assert.ok(content.includes("review-fixer"), "Should mention review-fixer");
+  });
+
+  it("mentions 4-round max per work unit", async () => {
+    const content = await readTemplate("agents", "orchestrator.md");
+    assert.ok(content.includes("round < 4"), "Should enforce 4-round limit");
+  });
+});
+
+describe("review-fixer agent template", () => {
+  it("exists and has required structure", async () => {
+    const content = await readTemplate("agents", "review-fixer.md");
+    assert.ok(content.includes("Triage"), "Should mention triage step");
+    assert.ok(content.includes("Fix"), "Should mention fix step");
+    assert.ok(content.includes("report"), "Should mention report output");
+  });
+
+  it("requires finding validation against actual code", async () => {
+    const content = await readTemplate("agents", "review-fixer.md");
+    assert.ok(content.includes("Does the cited code actually exist"), "Should validate findings against code");
+    assert.ok(content.includes("Does the claim hold up"), "Should validate claims");
+  });
+
+  it("writes fix report with round number", async () => {
+    const content = await readTemplate("agents", "review-fixer.md");
+    assert.ok(content.includes("fix-<ROUND>"), "Should write fix report with round number");
+  });
 });

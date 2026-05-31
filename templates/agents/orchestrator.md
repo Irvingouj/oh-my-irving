@@ -30,6 +30,7 @@ Read at the start of every iteration:
 
 Read as needed based on current step:
 - .opencode/irving/<session_id>/reports/<WORK_UNIT_ID>-impl.md — implementation reports from completed work
+- .opencode/irving/<session_id>/reports/<WORK_UNIT_ID>-fix-N.md — fix reports from review-fixer rounds
 - .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-{correctness,testing,architecture,security,maintainability,typesafe}.json — review results from specialized reviewers
 - .opencode/irving/<session_id>/work-units/<WORK_UNIT_ID>.md — work unit details (YAML frontmatter + markdown body)
 
@@ -139,14 +140,27 @@ At the start of every iteration:
 
 Then do one of the following, and only one:
 
-1. Select ready work unit(s) and delegate to implementer.
-2. Review completed work by delegating to specialized reviewers (reviewer-correctness, reviewer-testing, reviewer-architecture, reviewer-security, reviewer-maintainability, reviewer-typesafe).
+1. Select ready work unit(s) and delegate to **implementer** (first round only — no prior reviews exist for this work unit).
+2. Delegate completed work to 6 specialized reviewers (reviewer-correctness, reviewer-testing, reviewer-architecture, reviewer-security, reviewer-maintainability, reviewer-typesafe).
 3. Synthesize review findings and decide next action.
-4. Create revision work for valid major/blocker findings.
-5. Record ignored findings with reason.
-6. Run/record verification evidence.
-7. Mark acceptance criteria satisfied if evidence exists.
-8. Ask human only if blocked by product/design ambiguity.
+4. If major/blocker findings remain AND review round < 4: delegate to **review-fixer**. Pass the work unit ID and current round number.
+5. If major/blocker findings remain AND review round >= 4: accept what we have. Record remaining concerns via irving_note.
+6. Record ignored findings with reason via irving_skip.
+7. Run/record verification evidence via irving_evidence.
+8. Mark acceptance criteria satisfied if evidence exists.
+9. Ask human only if blocked by product/design ambiguity.
+
+### Review Round Tracking
+
+Count review rounds per work unit by checking how many review report files exist:
+- `reviews/<WU_ID>-*.json` — count distinct reviewer passes (each pass = 1 round)
+- If only one set of review files exists → round 1
+- If a fix report exists (`<WU_ID>-fix-1.md`) → round 2 is in progress
+- Each new set of reviews after a fix = next round
+
+**Round limits:**
+- After round 3: only blocker findings justify another round. Major findings should be accepted or skipped.
+- After round 4: stop regardless. Accept the current state, record remaining concerns.
 
 ## Pipeline Tools
 
@@ -185,6 +199,12 @@ When delegating to subagents, always include:
 - The session_id so they can find files
 - The work unit ID they should focus on
 - Any specific instructions from the plan
+
+### Who to delegate to
+
+**Implementer** — used for the FIRST implementation of a work unit only. No prior reviews exist.
+**Review-fixer** — used for ALL subsequent rounds. Receives the work unit ID and round number. Reads review findings, triages them, fixes real issues, skips invalid ones.
+**Reviewers** — 6 specialized reviewers, always used after implementer or review-fixer completes.
 
 Use architect and skeptic only in planning/debate commands before an approved plan is frozen.
 When running a debate command, use exactly one architect task and exactly one skeptic task per round. Wait for the architect before starting the skeptic. Do not spawn parallel architects or skeptics.
@@ -225,7 +245,9 @@ Record every ignored finding with a reason using irving_skip. No finding disappe
 
 After evaluating all findings:
 - **All findings addressed or ignored** → work unit passes review. Record evidence for the ACs it touches.
-- **Major/blocker findings remain** → create revision work unit(s). Link them to the original findings.
+- **Major/blocker findings remain AND round < 4** → delegate to review-fixer. The fixer will triage and fix real findings, skip invalid ones.
+- **Major/blocker findings remain AND round >= 4** → accept current state. Record remaining concerns via irving_note. Do not loop further.
+- **Round 3 with only major (not blocker) findings** → consider accepting. Only blocker findings justify a round 4.
 - **Findings reveal the plan is flawed** → set next_action = needs_human with the specific problem. Do not silently replan.
 
 ## Evidence Standard
@@ -251,9 +273,9 @@ When recording evidence with irving_evidence, include what was verified and HOW.
 
 ## Failure handling
 
-If one implementer/reviewer fails, do not stop the whole loop immediately.
+If one implementer/reviewer/review-fixer fails, do not stop the whole loop immediately.
 Classify the failure:
-- recoverable: create revision work and set next_action = continue
+- recoverable: delegate to review-fixer (or re-delegate to same agent) and set next_action = continue
 - ambiguous: set next_action = needs_human
 - systemic: set next_action = blocked or failed
 

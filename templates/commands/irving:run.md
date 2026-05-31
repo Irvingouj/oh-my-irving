@@ -42,15 +42,19 @@ Use exactly one architect and one skeptic per round. Never parallel.
 Call irving_advance with "execution".
 
 1. Call irving_work_unit for each work unit in the plan.
-2. Loop:
+2. Loop per work unit (max 4 review rounds per work unit):
    a. Call irving_status to read state. Parse work-units/*.md for status and dependencies.
    b. Select ready work unit(s) respecting dependency order.
-   c. Delegate to implementer.
-   d. Delegate completed work to the 6 reviewers.
-   e. Synthesize findings. Create revision work for real major/blocker issues. Ignore nits via irving_skip.
-   f. Call irving_evidence for satisfied acceptance criteria.
-   g. If all ACs have strong evidence AND the product goal is met, proceed to Phase 4.
-   h. Otherwise call irving_next with "continue" and keep looping.
+   c. **Round 1:** Delegate to implementer.
+   d. After implementation, delegate completed work to the 6 reviewers.
+   e. Synthesize findings.
+   f. If major/blocker findings remain AND round < 4: delegate to **review-fixer**. Pass the work unit ID and round number.
+   g. After review-fixer completes, go back to (d) — delegate to reviewers again.
+   h. If all findings addressed/ignored OR max rounds reached: record evidence via irving_evidence, skip invalid findings via irving_skip.
+   i. After round 3: only blocker findings justify another round. Accept major-level issues or skip them.
+   j. After round 4: accept current state regardless. Record remaining concerns.
+   k. If all ACs across all work units have strong evidence AND the product goal is met, proceed to Phase 4.
+   l. Otherwise call irving_next with "continue".
 
 ## Phase 4: Final Review
 
@@ -63,5 +67,5 @@ Call irving_advance with "execution".
 
 - Call irving_next at the end of every invocation.
 - Never skip phases. Never skip the human approval gates.
-- Never impersonate architect, skeptic, discoverer, or reviewers. Always delegate via Task.
+- Never impersonate architect, skeptic, discoverer, reviewers, or review-fixer. Always delegate via Task.
 - Never set action "accepted" unless every AC has strong evidence AND human approved.

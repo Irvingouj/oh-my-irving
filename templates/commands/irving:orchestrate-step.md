@@ -15,14 +15,16 @@ At the start of every iteration:
 
 Do one of the following, and only one:
 
-1. Read work unit files from work-units/*.md, parse YAML frontmatter for dependencies, and select ready work unit(s) to delegate to implementer.
-2. Review completed work by delegating to reviewers.
-3. Evaluate reviewer findings.
-4. Create revision work.
-5. Run/record verification evidence via irving_evidence.
-6. Mark acceptance criteria satisfied if evidence exists.
-7. Request expensive review if all ACs are satisfied.
-8. Ask human only if blocked by product/design ambiguity.
+1. Read work unit files from work-units/*.md, parse YAML frontmatter for dependencies, and select ready work unit(s) to delegate to **implementer** (first round only — no prior reviews exist).
+2. Delegate completed work to the 6 specialized reviewers.
+3. Synthesize reviewer findings. Decide: accept, skip, or fix.
+4. If major/blocker findings remain AND round < 4: delegate to **review-fixer**. Pass work unit ID and round number.
+5. If round >= 4: accept current state, record concerns.
+6. Record verification evidence via irving_evidence.
+7. Record skipped findings via irving_skip.
+8. Mark acceptance criteria satisfied if evidence exists.
+9. Request expensive review if all ACs are satisfied.
+10. Ask human only if blocked by product/design ambiguity.
 
 Do not invoke architect or skeptic during normal execution. They are planning-phase agents.
 If the approved plan is invalid, incomplete, or needs architectural debate, do not quietly replan.

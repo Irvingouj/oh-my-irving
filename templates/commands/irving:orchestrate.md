@@ -21,18 +21,20 @@ At the start of orchestration:
    - Stop. Do not proceed to execution.
 3. Only proceed if the plan is approved.
 
-Loop until all acceptance criteria are satisfied:
+Loop until all acceptance criteria are satisfied (max 4 review rounds per work unit):
 1. Call irving_status.
 2. Read work unit files from work-units/*.md and parse YAML frontmatter for id, title, status, and dependencies.
 3. Select next logical work unit(s), respecting the dependencies field in frontmatter.
-4. Delegate to implementer.
-5. Delegate completed work to the 6 specialized reviewers.
-6. Evaluate findings.
-7. Create revision work for valid major/blocker findings.
-8. Record ignored findings via irving_skip.
-9. Run relevant verification.
-10. Record acceptance evidence via irving_evidence.
-11. Continue.
+4. If no prior reviews exist for this work unit: delegate to **implementer**.
+5. If review-fixer just completed or reviews exist but prior fix was done: check review round count.
+6. Delegate completed work to the 6 specialized reviewers.
+7. Evaluate findings.
+8. If major/blocker findings remain AND round < 4: delegate to **review-fixer**. Pass work unit ID and round number.
+9. If major/blocker findings remain AND round >= 4: accept current state, record concerns.
+10. After round 3: only blocker findings justify another round.
+11. Record ignored findings via irving_skip.
+12. Record acceptance evidence via irving_evidence.
+13. Continue.
 
 Stop and ask human only when:
 - product behavior is ambiguous
