@@ -337,24 +337,24 @@ describe("pipeline tools", () => {
   describe("irving_next", () => {
     it("sets next action and reason", async () => {
       const result = await tools.irving_next.execute({
-        action: "needs_human",
+        action: "blocked",
         why: "Waiting for approval",
       }, context);
-      assert.ok((result as string).includes("needs_human"));
+      assert.ok((result as string).includes("blocked"));
 
       const file = statePath(tmpDir, "test-session");
       const state = JSON.parse(await readFile(file, "utf8"));
-      assert.strictEqual(state.execution.next_action, "needs_human");
+      assert.strictEqual(state.execution.next_action, "blocked");
       assert.strictEqual(state.execution.reason, "Waiting for approval");
       assert.strictEqual(state.execution.blocking_question, "Waiting for approval");
     });
 
-    it("defaults invalid action to needs_human", async () => {
+    it("defaults invalid action to blocked", async () => {
       const result = await tools.irving_next.execute({
         action: "bogus",
         why: "test",
       }, context);
-      assert.ok((result as string).includes("needs_human"));
+      assert.ok((result as string).includes("blocked"));
     });
 
     it("sets continue without blocking question", async () => {

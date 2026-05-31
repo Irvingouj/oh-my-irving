@@ -65,9 +65,9 @@ describe("irving:orchestrate command template", () => {
     assert.ok(content.includes("Plan not approved. Run irving:debate first."), "Should mention debate first");
   });
 
-  it("calls irving_next with needs_human when plan not approved", async () => {
+  it("calls irving_next with blocked when plan not approved", async () => {
     const content = await readTemplate("commands", "irving:orchestrate.md");
-    assert.ok(content.includes('"needs_human"'), "Should set needs_human");
+    assert.ok(content.includes('"blocked"'), "Should set blocked");
   });
 });
 
@@ -78,9 +78,9 @@ describe("irving:orchestrate-step command template", () => {
     assert.ok(content.includes("Plan not approved. Run irving:debate first."), "Should mention debate first");
   });
 
-  it("calls irving_next with needs_human when plan not approved", async () => {
+  it("calls irving_next with blocked when plan not approved", async () => {
     const content = await readTemplate("commands", "irving:orchestrate-step.md");
-    assert.ok(content.includes('"needs_human"'), "Should set needs_human");
+    assert.ok(content.includes('"blocked"'), "Should set blocked");
   });
 });
 
@@ -88,7 +88,7 @@ describe("orchestrator agent template", () => {
   it("mentions plan approval check in loop contract", async () => {
     const content = await readTemplate("agents", "orchestrator.md");
     assert.ok(
-      content.includes("If phase is") && content.includes("needs_human"),
+      content.includes("If phase is") && content.includes("blocked"),
       "Should mention plan approval check"
     );
   });

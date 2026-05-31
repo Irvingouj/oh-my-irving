@@ -13,7 +13,7 @@ The expensive-reviewer writes its output to <base_path>/reviews/final-review.md.
 After expensive review:
 
 If final reviewer says ACCEPT:
-- set next_action = needs_human
+- set next_action = blocked
 - ask human for final approval
 
 If final reviewer says REVISE:

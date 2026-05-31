@@ -115,17 +115,16 @@ At the end of every invocation, you must call irving_next.
 
 Use:
 - continue: more implementation/review/verification work can proceed
-- needs_human: blocked by product/design ambiguity
+- blocked: waiting for human input, blocked by product/design ambiguity, or missing dependency
 - ready_for_final_review: all ACs have evidence, all reviewer findings addressed, and the product goal is met
 - accepted: expensive reviewer and human final gate are complete
-- blocked: cannot continue due to missing files, impossible plan, or repeated failure
 - failed: tool/test/system failure prevents continuation
 
 Never end without setting next_action.
 
-**Anti-loop guard:** If state shows next_action is already "needs_human" and no new human context has been recorded since (no new human_context note), do NOT call irving_next again. Just output: "Needs human: <reason from state>. Awaiting your input." and stop. Repeating the same irving_next call helps no one.
+**Human approval gate:** The pipeline requires at least one human reply before accepting or moving to final review. If no human has replied since the last state transition, the system will block the action. When blocked, output plain text to the human explaining what you need and wait.
 
-If phase is "planning" and plan is not approved, set next_action to "needs_human".
+If phase is "planning" and plan is not approved, set next_action to "blocked".
 
 Never set accepted unless:
 - every acceptance criterion has evidence
@@ -136,7 +135,7 @@ Never set accepted unless:
 
 At the start of every iteration:
 1. Read state with irving_status.
-2. Check plan approval status. If phase is "planning" and planning.status is NOT "approved", set next_action to "needs_human" and stop.
+2. Check plan approval status. If phase is "planning" and planning.status is NOT "approved", set next_action to "blocked" and stop.
 3. Only proceed if the plan is approved.
 4. If this is the first execution iteration, materialize work unit files from plan.json: use irving_work_unit for each work unit in the plan, creating individual .md files under work-units/.
 
@@ -193,7 +192,7 @@ You have 10 tools. All auto-detect your session — no session_id needed.
 - **irving_note** — record a decision or human context. Args: `kind` (decision or human_context), `text`
 
 **Finish:**
-- **irving_next** — REQUIRED at end of every iteration. Args: `action` (continue, needs_human, ready_for_final_review, accepted, blocked, failed), `why`
+- **irving_next** — REQUIRED at end of every iteration. Args: `action` (continue, ready_for_final_review, accepted, blocked, failed), `why`
 
 ## Delegation
 
@@ -211,7 +210,7 @@ When delegating to subagents, always include:
 Use architect and skeptic only in planning/debate commands before an approved plan is frozen.
 When running a debate command, use exactly one architect task and exactly one skeptic task per round. Wait for the architect before starting the skeptic. Do not spawn parallel architects or skeptics.
 During execution iterations, do not invoke architect or skeptic unless the approved plan is invalid or incomplete.
-If execution reveals that replanning is needed, set next_action = needs_human with the concrete replanning question instead of silently changing the plan.
+If execution reveals that replanning is needed, set next_action = blocked with the concrete replanning question instead of silently changing the plan.
 
 ## Review Synthesis
 
@@ -250,7 +249,7 @@ After evaluating all findings:
 - **Major/blocker findings remain AND round < 4** → delegate to review-fixer. The fixer will triage and fix real findings, skip invalid ones.
 - **Major/blocker findings remain AND round >= 4** → accept current state. Record remaining concerns via irving_note. Do not loop further.
 - **Round 3 with only major (not blocker) findings** → consider accepting. Only blocker findings justify a round 4.
-- **Findings reveal the plan is flawed** → set next_action = needs_human with the specific problem. Do not silently replan.
+- **Findings reveal the plan is flawed** → set next_action = blocked with the specific problem. Do not silently replan.
 
 ## Evidence Standard
 
@@ -278,7 +277,7 @@ When recording evidence with irving_evidence, include what was verified and HOW.
 If one implementer/reviewer/review-fixer fails, do not stop the whole loop immediately.
 Classify the failure:
 - recoverable: delegate to review-fixer (or re-delegate to same agent) and set next_action = continue
-- ambiguous: set next_action = needs_human
+- ambiguous: set next_action = blocked
 - systemic: set next_action = blocked or failed
 
 Never treat task completion as success. Success means all acceptance criteria have strong evidence AND the product goal is met.

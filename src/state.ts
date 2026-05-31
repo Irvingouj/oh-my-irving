@@ -11,7 +11,7 @@ import { validateState, validatePlan } from "./schema.js";
 
 export type Phase = "init" | "discovery" | "planning" | "execution" | "final_review" | "accepted" | "blocked";
 
-export type NextAction = "continue" | "needs_human" | "ready_for_final_review" | "accepted" | "blocked" | "failed";
+export type NextAction = "continue" | "ready_for_final_review" | "accepted" | "blocked" | "failed";
 
 export type State = {
   version: 1;

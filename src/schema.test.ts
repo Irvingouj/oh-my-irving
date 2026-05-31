@@ -101,7 +101,7 @@ describe("validateState", () => {
     const state = { ...makeValidState(), execution: { ...makeValidState().execution, next_action: "pause" } };
     assert.throws(
       () => validateState(state),
-      /Invalid state.execution.next_action: must be one of continue, needs_human, ready_for_final_review, accepted, blocked, failed/,
+      /Invalid state.execution.next_action: must be one of continue, ready_for_final_review, accepted, blocked, failed/,
     );
   });
 
@@ -124,7 +124,7 @@ describe("validateState", () => {
   });
 
   it("accepts all valid next_actions", () => {
-    const actions = ["continue", "needs_human", "ready_for_final_review", "accepted", "blocked", "failed"] as const;
+    const actions = ["continue", "ready_for_final_review", "accepted", "blocked", "failed"] as const;
     for (const next_action of actions) {
       const state = { ...makeValidState(), execution: { ...makeValidState().execution, next_action } };
       assert.doesNotThrow(() => validateState(state));

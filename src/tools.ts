@@ -284,20 +284,20 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
     }),
 
     irving_next: tool({
-      description: "End this iteration. Say what happens next.",
+      description: "End this iteration. Say what happens next. Use blocked when waiting for human input — then output plain text to the human and wait.",
       args: {
-        action: tool.schema.string().describe("continue, needs_human, ready_for_final_review, accepted, blocked, or failed"),
+        action: tool.schema.string().describe("continue, ready_for_final_review, accepted, blocked, or failed"),
         why: tool.schema.string().describe("One sentence explaining why"),
       },
       async execute(args, context) {
         requireOrchestrator(context);
         const sessionId = await autoSessionId(worktree, context);
         const state = await readStateFile(worktree, sessionId);
-        const valid = ["continue", "needs_human", "ready_for_final_review", "accepted", "blocked", "failed"];
-        const action = valid.includes(args.action) ? args.action : "needs_human";
+        const valid = ["continue", "ready_for_final_review", "accepted", "blocked", "failed"];
+        const action = valid.includes(args.action) ? args.action : "blocked";
         state.execution.next_action = action as typeof state.execution.next_action;
         state.execution.reason = args.why;
-        state.execution.blocking_question = action === "needs_human" ? args.why : null;
+        state.execution.blocking_question = action === "blocked" ? args.why : null;
         await writeStateFile(worktree, sessionId, state);
         await logEvent(worktree, sessionId, { type: "pipeline.next_action", action, why: args.why });
         return `${action}: ${args.why} (iteration ${state.execution.iteration})`;

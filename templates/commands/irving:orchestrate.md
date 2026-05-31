@@ -16,7 +16,7 @@ Preconditions:
 At the start of orchestration:
 1. Call irving_status.
 2. If phase is "planning" and planning.status is NOT "approved":
-   - Call irving_next with "needs_human"
+   - Call irving_next with "blocked"
    - Reason: "Plan not approved. Run irving:debate first."
    - Stop. Do not proceed to execution.
 3. Only proceed if the plan is approved.
@@ -42,4 +42,6 @@ Stop and ask human only when:
 - plan/objective needs to change
 - expensive-reviewer should be invoked
 
-**Critical:** After calling irving_next with "needs_human", STOP the loop. Do not iterate further. The user must provide new context or run /irving:resume-after-human.
+**Human approval gate:** accepted and ready_for_final_review require at least one human reply since the last state transition. If blocked, output plain text to the human and wait.
+
+**Critical:** After calling irving_next with "blocked", STOP the loop. Do not iterate further. The user must provide new context or run /irving:resume-after-human.

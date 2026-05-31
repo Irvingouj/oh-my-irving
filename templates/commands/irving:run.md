@@ -15,7 +15,7 @@ If <base_path>/context-pack.md does NOT exist:
 1. Call irving_advance with "discovery".
 2. Delegate exactly one Task to the discoverer agent with the user's task as input.
 3. Wait for discoverer to complete.
-4. If discoverer produced a BLOCKED context pack (task too vague), call irving_next with "needs_human" and STOP.
+4. If discoverer produced a BLOCKED context pack (task too vague), call irving_next with "blocked" and STOP.
 5. Once context-pack.md exists, proceed to Phase 2.
 
 ## Phase 2: Planning (Debate)
@@ -66,7 +66,8 @@ Call irving_advance with "execution".
 ## Rules
 
 - Call irving_next at the end of every invocation.
-- After calling irving_next with "needs_human", STOP the loop. Do not iterate further. The user must resume via /irving:resume-after-human or by providing new context.
+- **Human approval gate:** accepted and ready_for_final_review require at least one human reply since the last state transition. If blocked, output plain text to the human and wait.
+- After calling irving_next with "blocked", STOP the loop. Do not iterate further. The user must resume via /irving:resume-after-human or by providing new context.
 - Never skip phases. Never skip the human approval gates.
 - Never impersonate architect, skeptic, discoverer, reviewers, or review-fixer. Always delegate via Task.
 - Never set action "accepted" unless every AC has strong evidence AND human approved.

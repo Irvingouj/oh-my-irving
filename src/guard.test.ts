@@ -259,5 +259,114 @@ describe("createGuardHooks", () => {
         /\[anti-loop\]/,
       );
     });
+
+    describe("human reply gate", () => {
+      it("blocks irving_next(accepted) without human reply", async () => {
+        await assert.rejects(
+          async () => await hooks["tool.execute.before"](
+            { tool: "irving_next", sessionID: "ses-1", callID: "call-1" },
+            { args: { action: "accepted", why: "done" } },
+          ),
+          /HUMAN_REPLY_NOT_DETECTED/,
+        );
+      });
+
+      it("allows irving_next(accepted) after human reply", async () => {
+        // Simulate human reply via chat.message
+        await hooks["chat.message"](
+          { sessionID: "ses-1", agent: "orchestrator" },
+          { message: { role: "user" }, parts: [{ type: "text", text: "approved" }] },
+        );
+
+        // Now accepted should be allowed
+        await hooks["tool.execute.before"](
+          { tool: "irving_next", sessionID: "ses-1", callID: "call-2" },
+          { args: { action: "accepted", why: "done" } },
+        );
+      });
+
+      it("blocks second accepted without another human reply", async () => {
+        // First human reply + accepted
+        await hooks["chat.message"](
+          { sessionID: "ses-2", agent: "orchestrator" },
+          { message: { role: "user" }, parts: [{ type: "text", text: "approved" }] },
+        );
+        await hooks["tool.execute.before"](
+          { tool: "irving_next", sessionID: "ses-2", callID: "call-1" },
+          { args: { action: "accepted", why: "done" } },
+        );
+
+        // Second accepted without new human reply → blocked
+        await assert.rejects(
+          async () => await hooks["tool.execute.before"](
+            { tool: "irving_next", sessionID: "ses-2", callID: "call-2" },
+            { args: { action: "accepted", why: "done again" } },
+          ),
+          /HUMAN_REPLY_NOT_DETECTED/,
+        );
+      });
+
+      it("allows irving_next(ready_for_final_review) after human reply", async () => {
+        await hooks["chat.message"](
+          { sessionID: "ses-3", agent: "orchestrator" },
+          { message: { role: "user" }, parts: [{ type: "text", text: "go ahead" }] },
+        );
+        await hooks["tool.execute.before"](
+          { tool: "irving_next", sessionID: "ses-3", callID: "call-1" },
+          { args: { action: "ready_for_final_review", why: "all ACs met" } },
+        );
+      });
+
+      it("allows irving_next(continue) without human reply", async () => {
+        // continue is not a critical action — should always pass
+        await hooks["tool.execute.before"](
+          { tool: "irving_next", sessionID: "ses-4", callID: "call-1" },
+          { args: { action: "continue", why: "keep going" } },
+        );
+      });
+
+      it("allows irving_next(blocked) without human reply", async () => {
+        // blocked is not a critical action — should always pass
+        await hooks["tool.execute.before"](
+          { tool: "irving_next", sessionID: "ses-4", callID: "call-2" },
+          { args: { action: "blocked", why: "dependency issue" } },
+        );
+      });
+
+      it("chat.message ignores non-user messages", async () => {
+        // assistant message should not increment counter
+        await hooks["chat.message"](
+          { sessionID: "ses-5", agent: "orchestrator" },
+          { message: { role: "assistant" }, parts: [{ type: "text", text: "thinking..." }] },
+        );
+
+        await assert.rejects(
+          async () => await hooks["tool.execute.before"](
+            { tool: "irving_next", sessionID: "ses-5", callID: "call-1" },
+            { args: { action: "accepted", why: "done" } },
+          ),
+          /HUMAN_REPLY_NOT_DETECTED/,
+        );
+      });
+
+      it("auto-records human message to debate file", async () => {
+        await mkdir(path.join(sessionDir(tmpDir, "ses-6"), "debate"), { recursive: true });
+        await writeFile(
+          path.join(sessionDir(tmpDir, "ses-6"), "state.json"),
+          JSON.stringify({ version: 1, session_id: "ses-6", phase: "planning", planning: { status: "debating", round: 2 }, execution: { status: "not_started", iteration: 0, next_action: "continue", reason: "", blocking_question: null, last_error: null, active_work_units: [], blocked_work_units: [], ignored_findings: [], evidence: [] } }) + "\n",
+          "utf8",
+        );
+
+        await hooks["chat.message"](
+          { sessionID: "ses-6", agent: "orchestrator" },
+          { message: { role: "user" }, parts: [{ type: "text", text: "I want it done by Friday" }] },
+        );
+
+        const file = path.join(sessionDir(tmpDir, "ses-6"), "debate", "round-002-human.md");
+        assert.strictEqual(existsSync(file), true);
+        const content = await readFile(file, "utf8");
+        assert.ok(content.includes("I want it done by Friday"));
+      });
+    });
   });
 });

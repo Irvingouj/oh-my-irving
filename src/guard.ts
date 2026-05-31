@@ -1,11 +1,14 @@
-import { readFile } from "node:fs/promises";
+import { readFile, appendFile } from "node:fs/promises";
 import { existsSync } from "node:fs";
 import path from "node:path";
 import {
   sessionAnchorPath,
   assertSessionConsistent,
+  ensureDirs,
+  logsDir,
+  debateDir,
 } from "./session.js";
-import { logEvent } from "./state.js";
+import { readStateFile, logEvent } from "./state.js";
 
 async function resolveGuardSessionId(worktree: string, sessionID?: string): Promise<string | undefined> {
   if (sessionID) return sessionID;
@@ -141,8 +144,24 @@ function checkAntiLoop(recent: ToolCall[], tool: string, args: Record<string, un
   }
 }
 
+const AWAITING_HUMAN_MESSAGE = [
+  "[irving] HUMAN_REPLY_NOT_DETECTED!",
+  "",
+  "You are trying to approve/accept without a human reply since the last state transition.",
+  "YOU CANNOT MOVE FORWARD WITHOUT HUMAN REPLY.",
+  "STOP CALLING ANY TOOLS IMMEDIATELY.",
+  "STOP GENERATING JSON OR TOOL CALLS.",
+  "OUTPUT PLAIN TEXT TO THE HUMAN AND WAIT FOR THEIR REPLY.",
+].join("\n");
+
 export function createGuardHooks(worktree: string) {
   const recentToolCalls: ToolCall[] = [];
+  // Human reply tracking: count user messages vs last approved count per session
+  const humanMessageCount = new Map<string, number>();
+  const lastApprovedAtCount = new Map<string, number>();
+
+  const CRITICAL_ACTIONS = new Set(["accepted", "ready_for_final_review"]);
+  const CRITICAL_PHASES = new Set(["accepted", "final_review"]);
 
   return {
     event: async ({ event }: { event: { type: string;[key: string]: unknown } }) => {
@@ -168,12 +187,27 @@ export function createGuardHooks(worktree: string) {
       const sessionID = input.sessionID;
       await assertSessionConsistent(worktree, sessionID);
 
-      // Check first, but always track the call — even blocked attempts advance the strike counter
+      // Anti-loop detection — always track, even blocked attempts advance the counter
       try {
         checkAntiLoop(recentToolCalls, toolName, output.args ?? {});
       } finally {
         recentToolCalls.push({ tool: toolName, argsHash: stableStringify(output.args ?? {}) });
         while (recentToolCalls.length > WINDOW_SIZE) recentToolCalls.shift();
+      }
+
+      // --- Human reply gate for critical transitions ---
+      const isCriticalAction = toolName === "irving_next" && CRITICAL_ACTIONS.has(output.args?.action as string);
+      const isCriticalPhase = toolName === "irving_advance" && CRITICAL_PHASES.has(output.args?.to as string);
+
+      if (isCriticalAction || isCriticalPhase) {
+        const humanCount = humanMessageCount.get(sessionID) ?? 0;
+        const lastApproved = lastApprovedAtCount.get(sessionID) ?? 0;
+        if (humanCount <= lastApproved) {
+          await logEvent(worktree, sessionID, { type: "guard.blocked_no_human_reply", tool: toolName, args: output.args });
+          throw new Error(AWAITING_HUMAN_MESSAGE);
+        }
+        lastApprovedAtCount.set(sessionID, humanCount);
+        await logEvent(worktree, sessionID, { type: "guard.critical_transition_approved", tool: toolName, humanCount });
       }
 
       await logEvent(worktree, sessionID, {
@@ -203,6 +237,35 @@ export function createGuardHooks(worktree: string) {
         tool: input.tool,
         output,
       });
+    },
+
+    // --- Human reply detector: count user messages and auto-record to debate ---
+    "chat.message": async (input: { sessionID: string; agent?: string }, output: { message: { role: string }; parts: Array<{ type: string; text?: string }> }) => {
+      const sessionId = input.sessionID;
+
+      // Only react to user messages
+      if (output.message.role !== "user") return;
+
+      // Increment human message counter
+      const current = humanMessageCount.get(sessionId) ?? 0;
+      humanMessageCount.set(sessionId, current + 1);
+      await logEvent(worktree, sessionId, { type: "guard.human_reply_detected", count: current + 1 });
+
+      // Extract text and auto-record to debate file
+      const textParts = output.parts
+        .filter((p): p is { type: "text"; text: string } => p.type === "text" && typeof (p as { text?: string }).text === "string")
+        .map(p => p.text);
+      const text = textParts.join("\n");
+      if (!text.trim()) return;
+
+      try {
+        const state = await readStateFile(worktree, sessionId);
+        const fileName = `round-${String(state.planning.round).padStart(3, "0")}-human.md`;
+        await appendFile(path.join(debateDir(worktree, sessionId), fileName), text + "\n\n", "utf8");
+        await logEvent(worktree, sessionId, { type: "guard.human_context_auto_recorded", file: fileName });
+      } catch {
+        // If state/debate dir doesn't exist yet, just skip recording
+      }
     },
 
     // Keep shell tools aware of the current OpenCode session.

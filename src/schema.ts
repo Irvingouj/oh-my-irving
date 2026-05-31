@@ -12,7 +12,6 @@ const PHASES: readonly Phase[] = [
 
 const NEXT_ACTIONS: readonly NextAction[] = [
   "continue",
-  "needs_human",
   "ready_for_final_review",
   "accepted",
   "blocked",
