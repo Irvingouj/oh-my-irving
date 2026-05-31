@@ -41,3 +41,5 @@ Stop and ask human only when:
 - acceptance criteria need to change
 - plan/objective needs to change
 - expensive-reviewer should be invoked
+
+**Critical:** After calling irving_next with "needs_human", STOP the loop. Do not iterate further. The user must provide new context or run /irving:resume-after-human.

@@ -123,6 +123,8 @@ Use:
 
 Never end without setting next_action.
 
+**Anti-loop guard:** If state shows next_action is already "needs_human" and no new human context has been recorded since (no new human_context note), do NOT call irving_next again. Just output: "Needs human: <reason from state>. Awaiting your input." and stop. Repeating the same irving_next call helps no one.
+
 If phase is "planning" and plan is not approved, set next_action to "needs_human".
 
 Never set accepted unless:

@@ -66,6 +66,7 @@ Call irving_advance with "execution".
 ## Rules
 
 - Call irving_next at the end of every invocation.
+- After calling irving_next with "needs_human", STOP the loop. Do not iterate further. The user must resume via /irving:resume-after-human or by providing new context.
 - Never skip phases. Never skip the human approval gates.
 - Never impersonate architect, skeptic, discoverer, reviewers, or review-fixer. Always delegate via Task.
 - Never set action "accepted" unless every AC has strong evidence AND human approved.

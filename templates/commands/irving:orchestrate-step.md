@@ -34,5 +34,7 @@ When delegating to subagents, always include the session_id.
 
 At the end, call irving_next with the action and why.
 
+If state already shows next_action is "needs_human" and no new context arrived, do NOT call irving_next again. Just output: "Needs human: <reason>. Awaiting your input." and stop.
+
 Do not claim the workflow is complete unless all acceptance criteria have evidence.
 Do not continue into a second iteration.
