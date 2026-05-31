@@ -47,7 +47,7 @@ Call irving_advance with "execution".
    a. Call irving_status to read state. Parse work-units/*.md for status and dependencies.
    b. Select ready work unit(s) respecting dependency order.
    c. **Round 1:** Delegate to implementer.
-   d. After implementation, delegate completed work to the 6 reviewers.
+   d. After implementation, delegate completed work to the 7 reviewers.
    e. Synthesize findings.
    f. If major/blocker findings remain AND round < 4: delegate to **review-fixer**. Pass the work unit ID and round number.
    g. After review-fixer completes, go back to (d) — delegate to reviewers again.

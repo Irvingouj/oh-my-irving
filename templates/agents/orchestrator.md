@@ -31,7 +31,7 @@ Read at the start of every iteration:
 Read as needed based on current step:
 - .opencode/irving/<session_id>/reports/<WORK_UNIT_ID>-impl.md — implementation reports from completed work
 - .opencode/irving/<session_id>/reports/<WORK_UNIT_ID>-fix-N.md — fix reports from review-fixer rounds
-- .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-{correctness,testing,architecture,security,maintainability,typesafe}.json — review results from specialized reviewers
+- .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-{completeness,correctness,testing,architecture,security,maintainability,typesafe}.json — review results from specialized reviewers
 - .opencode/irving/<session_id>/work-units/<WORK_UNIT_ID>.md — work unit details (YAML frontmatter + markdown body)
 
 ## Work Units
@@ -153,7 +153,7 @@ At the start of every iteration:
 Then do one of the following, and only one:
 
 1. Select ready work unit(s) and delegate to **implementer** (first round only — no prior reviews exist for this work unit).
-2. Delegate completed work to 6 specialized reviewers (reviewer-correctness, reviewer-testing, reviewer-architecture, reviewer-security, reviewer-maintainability, reviewer-typesafe).
+2. Delegate completed work to 7 specialized reviewers (reviewer-completeness, reviewer-correctness, reviewer-testing, reviewer-architecture, reviewer-security, reviewer-maintainability, reviewer-typesafe).
 3. Synthesize review findings and decide next action.
 4. If major/blocker findings remain AND review round < 4: delegate to **review-fixer**. Pass the work unit ID and current round number.
 5. If major/blocker findings remain AND review round >= 4: accept what we have. Record remaining concerns via irving_note.
@@ -216,7 +216,7 @@ When delegating to subagents, always include:
 
 **Implementer** — used for the FIRST implementation of a work unit only. No prior reviews exist.
 **Review-fixer** — used for ALL subsequent rounds. Receives the work unit ID and round number. Reads review findings, triages them, fixes real issues, skips invalid ones.
-**Reviewers** — 6 specialized reviewers, always used after implementer or review-fixer completes.
+**Reviewers** — 7 specialized reviewers, always used after implementer or review-fixer completes. Completeness reviewer runs first — if the spec isn't fully implemented, nothing else matters.
 
 Use architect and skeptic only in planning/debate commands before an approved plan is frozen.
 When running a debate command, use exactly one architect task and exactly one skeptic task per round. Wait for the architect before starting the skeptic. Do not spawn parallel architects or skeptics.

@@ -63,6 +63,7 @@ describe("irving:orchestrate command template", () => {
     const content = await readTemplate("commands", "irving:orchestrate.md");
     assert.ok(content.includes('planning.status is NOT "approved"'), "Should check planning.status");
     assert.ok(content.includes("Plan not approved. Run irving:debate first."), "Should mention debate first");
+    assert.ok(content.includes("7 specialized reviewers"), "Should mention 7 reviewers");
   });
 
   it("calls irving_next with blocked when plan not approved", async () => {
@@ -151,4 +152,26 @@ describe("review-fixer agent template", () => {
     const content = await readTemplate("agents", "review-fixer.md");
     assert.ok(content.includes("fix-<ROUND>"), "Should write fix report with round number");
   });
+
+describe("completeness reviewer template", () => {
+  it("exists and has required structure", async () => {
+    const content = await readTemplate("agents", "reviewer-completeness.md");
+    assert.ok(content.includes("Extract the Specification"), "Should mention spec extraction");
+    assert.ok(content.includes("FULL"), "Should have FULL status");
+    assert.ok(content.includes("PARTIAL"), "Should have PARTIAL status");
+    assert.ok(content.includes("MISSING"), "Should have MISSING status");
+  });
+
+  it("treats partial as blocker", async () => {
+    const content = await readTemplate("agents", "reviewer-completeness.md");
+    assert.ok(content.includes("Any PARTIAL or MISSING requirement is a blocker"), "Should treat partial/missing as blocker");
+  });
+
+  it("checks for common half-implementations", async () => {
+    const content = await readTemplate("agents", "reviewer-completeness.md");
+    assert.ok(content.includes("Stubs"), "Should check for stubs");
+    assert.ok(content.includes("Missing branches"), "Should check for missing branches");
+    assert.ok(content.includes("Missing wiring"), "Should check for missing wiring");
+  });
+});
 });

@@ -27,7 +27,7 @@ Loop until all acceptance criteria are satisfied (max 4 review rounds per work u
 3. Select next logical work unit(s), respecting the dependencies field in frontmatter.
 4. If no prior reviews exist for this work unit: delegate to **implementer**.
 5. If review-fixer just completed or reviews exist but prior fix was done: check review round count.
-6. Delegate completed work to the 6 specialized reviewers.
+6. Delegate completed work to the 7 specialized reviewers.
 7. Evaluate findings.
 8. If major/blocker findings remain AND round < 4: delegate to **review-fixer**. Pass work unit ID and round number.
 9. If major/blocker findings remain AND round >= 4: accept current state, record concerns.

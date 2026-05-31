@@ -16,7 +16,7 @@ At the start of every iteration:
 Do one of the following, and only one:
 
 1. Read work unit files from work-units/*.md, parse YAML frontmatter for dependencies, and select ready work unit(s) to delegate to **implementer** (first round only — no prior reviews exist).
-2. Delegate completed work to the 6 specialized reviewers.
+2. Delegate completed work to the 7 specialized reviewers.
 3. Synthesize reviewer findings. Decide: accept, skip, or fix.
 4. If major/blocker findings remain AND round < 4: delegate to **review-fixer**. Pass work unit ID and round number.
 5. If round >= 4: accept current state, record concerns.
