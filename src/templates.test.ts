@@ -123,6 +123,14 @@ describe("orchestrator agent template", () => {
     assert.ok(content.includes("Tests"), "Should mention test check");
     assert.ok(content.includes("delegate back to the implementer"), "Should send failures back to implementer loop");
   });
+
+  it("mentions pre-flight acceptance criteria in plan creation", async () => {
+    const content = await readTemplate("agents", "orchestrator.md");
+    assert.ok(content.includes("Pre-flight Acceptance Criteria"), "Should have pre-flight AC section");
+    assert.ok(content.includes("builds without errors"), "Should mention build AC");
+    assert.ok(content.includes("tests pass"), "Should mention test AC");
+    assert.ok(content.includes("non-negotiable"), "Should mark these ACs as non-negotiable");
+  });
 });
 
 describe("review-fixer agent template", () => {

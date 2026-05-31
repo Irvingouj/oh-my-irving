@@ -30,7 +30,8 @@ If <base_path>/plan.json does NOT exist or planning.status is NOT "approved":
    e. If both agree OR convergence detected OR 8 rounds reached, stop.
 3. Use the grill-me skill to interview the human about the plan before freezing it.
 4. Once human approves:
-   - Call irving_plan with objective, criteria, and units.
+   - Before calling irving_plan, check if the project has build/lint/test tooling. If it does, add corresponding acceptance criteria (e.g., "AC: Project builds without errors", "AC: All tests pass"). These are non-negotiable — they must pass before final review.
+   - Call irving_plan with objective, criteria (including pre-flight ACs), and units.
    - Call irving_advance with "approved" to mark planning done.
 5. Proceed to Phase 3.
 

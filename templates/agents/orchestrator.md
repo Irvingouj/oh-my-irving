@@ -105,6 +105,17 @@ Use the `grill-me` skill to interview the human about the plan before freezing i
 
 The plan is frozen only after the human explicitly approves after being grilled. Do not treat silence or "looks good" as approval — the human should be able to defend the plan after your questions.
 
+### Pre-flight Acceptance Criteria
+
+When creating the plan with irving_plan, check if the project has build, lint, format, or test tooling (look at `package.json`, `Makefile`, `Cargo.toml`, `pyproject.toml`, or equivalent). If any of these exist, add a corresponding acceptance criterion:
+
+- If `build` script exists → `AC: Project builds without errors`
+- If `lint` or `format` script exists → `AC: Linting and formatting pass`
+- If `test` script exists → `AC: All tests pass`
+- If `e2e` or `integration` test script exists → `AC: E2E/integration tests pass`
+
+These are **non-negotiable** ACs — they must be satisfied before `ready_for_final_review`. They are verified during the pre-flight checks step.
+
 ## Loop contract
 
 You are controlled by an external supervisor.
