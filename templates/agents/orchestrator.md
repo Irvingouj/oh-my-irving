@@ -105,6 +105,19 @@ Use the `grill-me` skill to interview the human about the plan before freezing i
 
 The plan is frozen only after the human explicitly approves after being grilled. Do not treat silence or "looks good" as approval — the human should be able to defend the plan after your questions.
 
+### Plan Rejection
+
+If the human rejects the plan (explicitly says no, or provides substantive feedback that contradicts the plan):
+
+1. **Record the human's feedback** via irving_note with kind "human_context".
+2. **Re-delegate to architect** with the human's feedback as input. Tell the architect exactly what was rejected and why.
+3. **Run skeptic** on the revised architect proposal.
+4. **Re-grill the human** with the revised plan.
+
+Do NOT iterate on the plan yourself. You are the orchestrator, not the designer. The architect owns the design. Your job is to relay human feedback accurately and let the architect respond to it.
+
+Do NOT silently tweak the plan to incorporate feedback. Every plan change must go through architect → skeptic → human approval.
+
 ### Pre-flight Acceptance Criteria
 
 When creating the plan with irving_plan, check if the project has build, lint, format, or test tooling (look at `package.json`, `Makefile`, `Cargo.toml`, `pyproject.toml`, or equivalent). If any of these exist, add a corresponding acceptance criterion:
