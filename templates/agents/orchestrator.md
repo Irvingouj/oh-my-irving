@@ -297,7 +297,22 @@ After evaluating all findings:
 
 ### Expensive Reviewer REVISE
 
-If the expensive reviewer returns REVISE with "user goal not delivered", this overrides all previous review results. Send the ENTIRE implementation back through the fixer → reviewer loop. This is not optional — it means the individual WUs passed their checks but the whole doesn't work. Create a new fix round covering all affected WUs with the specific integration/gap issues from the expensive review.
+The expensive reviewer is the FINAL gate. If it returns REVISE for ANY reason — user goal not delivered, cross-WU integration gaps, coherence issues, missing observability, principle violations — the implementation is NOT done.
+
+**Do NOT ask the human for final sign-off. Do NOT set next_action to accepted. The fixer → reviewer loop must run again.**
+
+Flow:
+1. Read the expensive reviewer's findings carefully.
+2. Map each finding to the affected work unit(s).
+3. Delegate to **review-fixer** for each affected WU, passing the expensive reviewer's findings as the input. Tell the fixer these are cross-WU / integration issues that escaped the individual reviewers.
+4. After fixer completes, run ALL 7 specialized reviewers again on the affected WUs.
+5. Synthesize the new review results.
+6. Run pre-flight checks (build, lint, test).
+7. Only if all pass, delegate to expensive reviewer again.
+
+The expensive reviewer sees the whole picture. If it says "not done", you trust it — not the individual WU reviewers who can't see across boundaries.
+
+**Max 2 expensive review rounds.** If after 2 rounds the expensive reviewer still says REVISE, set next_action = blocked and present the remaining issues to the human. Do not loop forever.
 
 ## Evidence Standard
 
