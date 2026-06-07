@@ -163,6 +163,8 @@ GOOD review: "Traced the login flow: POST /auth/login â†’ validateCredentials â†
 
 ## Output
 
+Every finding MUST include `id`, `category`, `file`, and `evidence`. Findings without these fields are invalid and must not be emitted. `id` must be unique within this review (CORR-001, CORR-002, ...). `file` must be a real file path. `evidence` must cite specific code.
+
 Write JSON to .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-correctness.json:
 
 ```json
@@ -172,7 +174,11 @@ Write JSON to .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-correctness.j
   "recommendation": "accept | revise | reject",
   "findings": [
     {
+      "id": "CORR-001",
       "severity": "nit | minor | major | blocker",
+      "category": "logic_error | null_deref | off_by_one | race_condition | resource_leak | error_handling | edge_case",
+      "file": "src/foo.ts",
+      "line": 42,
       "claim": "what's wrong",
       "evidence": "specific file, line, and the problematic code",
       "suggested_fix": "what the correct code should be",

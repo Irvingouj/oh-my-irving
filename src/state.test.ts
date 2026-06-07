@@ -63,6 +63,7 @@ describe("readStateFile", () => {
         blocked_work_units: [],
         ignored_findings: [],
         evidence: [],
+        findings: [],
       },
     };
     await writeStateFile(tmpDir, sessionId, state);
@@ -100,6 +101,7 @@ describe("writeStateFile", () => {
         blocked_work_units: [],
         ignored_findings: [],
         evidence: [],
+        findings: [],
       },
     };
     await writeStateFile(tmpDir, sessionId, state);

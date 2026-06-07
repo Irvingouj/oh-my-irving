@@ -68,6 +68,8 @@ Do NOT read:
 
 Read ALL review JSON files for this work unit. For each finding from each reviewer:
 
+**Reference findings by their `id` field.** Every finding has a unique ID (e.g., SEC-001, CORR-002). Use this ID in your fix report and when discussing findings. This enables the orchestrator to track findings across rounds via irving_finding and irving_resolve_finding.
+
 **Is it real?**
 - Does the cited code actually exist? Go look.
 - Does the claim hold up when you trace the logic?

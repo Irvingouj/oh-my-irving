@@ -38,6 +38,19 @@ export type State = {
       ac_id: string;
       type: "test" | "review" | "manual" | "static";
       detail: string;
+      files?: string[];
+    }>;
+    findings: Array<{
+      finding_id: string;
+      wu_id: string;
+      reviewer: string;
+      severity: string;
+      claim: string;
+      evidence: string;
+      status: string;
+      category?: string;
+      file?: string;
+      line?: number;
     }>;
   };
 };
@@ -55,6 +68,12 @@ export type Plan = {
     status: string;
     dependencies: string[];
   }>;
+  preflight?: {
+    build?: string;
+    lint?: string;
+    test?: string;
+    e2e?: string;
+  };
 };
 
 export async function readStateFile(root: string, sessionId: string): Promise<State> {
@@ -77,6 +96,7 @@ export async function readStateFile(root: string, sessionId: string): Promise<St
         blocked_work_units: [],
         ignored_findings: [],
         evidence: [],
+        findings: [],
       },
     });
   }

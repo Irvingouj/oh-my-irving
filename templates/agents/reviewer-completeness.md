@@ -115,6 +115,8 @@ R4: "Block login until email confirmed" → MISSING. No check in login handler (
 
 ## Output
 
+Every finding MUST include `id`, `category`, `file`, and `evidence`. Findings without these fields are invalid and must not be emitted. `id` must be unique within this review (COMP-001, COMP-002, ...). `file` must be a real file path. `evidence` must cite specific code.
+
 Write JSON to .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-completeness.json:
 
 ```json
@@ -128,7 +130,11 @@ Write JSON to .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-completeness.
   "requirements_missing": 1,
   "findings": [
     {
+      "id": "COMP-001",
       "severity": "blocker",
+      "category": "missing_requirement | partial_implementation | wrong_behavior",
+      "file": "src/foo.ts",
+      "line": 42,
       "requirement": "the specific requirement text from the work unit",
       "status": "partial | missing",
       "evidence": "what the code actually does vs what was specified",

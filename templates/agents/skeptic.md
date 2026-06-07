@@ -157,3 +157,4 @@ Write to .opencode/irving/<session_id>/debate/round-N-skeptic.md:
 - Every objection must have evidence. "I feel like this is wrong" is not an objection.
 - You must also list validated claims. A review that only finds problems is not thorough — it's biased.
 - Product-value objections come first. Technical objections come second. The order matters — a technically perfect solution to the wrong problem is worse than a technically imperfect solution to the right problem.
+- **No-new-blockers statement:** If you have no new blocker-level objections compared to the previous round, you MUST explicitly state: "No new blocker-level objections. Remaining concerns are preference/tradeoff." This signals the debate loop to stop early.

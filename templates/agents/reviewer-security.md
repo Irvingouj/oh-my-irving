@@ -189,6 +189,8 @@ A theoretical risk in an internal tool is different from a practical exploit on 
 
 ## Output
 
+Every finding MUST include `id`, `category`, `file`, and `evidence`. Findings without these fields are invalid and must not be emitted. `id` must be unique within this review (SEC-001, SEC-002, ...). `file` must be a real file path. `evidence` must cite specific code.
+
 Write JSON to .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-security.json:
 
 ```json
@@ -198,7 +200,11 @@ Write JSON to .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-security.json
   "recommendation": "accept | revise | reject",
   "findings": [
     {
+      "id": "SEC-001",
       "severity": "nit | minor | major | blocker",
+      "category": "injection | auth_bypass | data_leak | insecure_crypto | missing_validation | privilege_escalation",
+      "file": "src/foo.ts",
+      "line": 42,
       "claim": "what's wrong",
       "evidence": "specific file, line, and the vulnerable code",
       "suggested_fix": "how to fix the vulnerability",

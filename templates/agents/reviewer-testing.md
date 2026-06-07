@@ -152,6 +152,8 @@ For every finding, answer: what real user behavior would be broken if this test 
 
 ## Output
 
+Every finding MUST include `id`, `category`, `file`, and `evidence`. Findings without these fields are invalid and must not be emitted. `id` must be unique within this review (TEST-001, TEST-002, ...). `file` must be a real file path. `evidence` must cite specific code.
+
 Write JSON to .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-testing.json:
 
 ```json
@@ -161,7 +163,11 @@ Write JSON to .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-testing.json:
   "recommendation": "accept | revise | reject",
   "findings": [
     {
+      "id": "TEST-001",
       "severity": "nit | minor | major | blocker",
+      "category": "false_green | missing_test | weak_assertion | mock_only | missing_edge_case | flaky",
+      "file": "src/foo.test.ts",
+      "line": 42,
       "claim": "what's wrong",
       "evidence": "specific test file and line, with the problematic code",
       "suggested_fix": "what the test should look like instead",

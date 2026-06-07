@@ -30,7 +30,7 @@ Loop until all acceptance criteria are satisfied (max 4 review rounds per work u
 6. Delegate completed work to the 7 specialized reviewers.
 7. Evaluate findings.
 8. If major/blocker findings remain AND round < 4: delegate to **review-fixer**. Pass work unit ID and round number.
-9. If major/blocker findings remain AND round >= 4: accept current state, record concerns.
+9. If major/blocker findings remain AND round >= 4: security/correctness/testing/completeness findings cannot be auto-accepted — skip as false positive, accept as risk (human must approve), or block. Architecture/maintainability/typesafe: accept and record concerns.
 10. After round 3: only blocker findings justify another round.
 11. Record ignored findings via irving_skip.
 12. Record acceptance evidence via irving_evidence.

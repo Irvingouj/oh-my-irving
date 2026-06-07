@@ -28,6 +28,7 @@ Debate limits:
 - Maximum 8 debate rounds. Hard limit.
 - After each round, compare the current architect proposal and skeptic objections to the previous round.
 - If they are substantially the same (convergence detected), stop early.
+- **Early stop on no-new-blockers:** If the skeptic has no new blocker-level objections compared to the previous round, stop and ask the human. Remaining major/minor concerns are preferences/tradeoffs the human can decide.
 
 After each round, evaluate agreement:
 - If architect and skeptic both agree (no blockers, no major objections), OR

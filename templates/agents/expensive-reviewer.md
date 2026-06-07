@@ -89,13 +89,9 @@ Each WU works in isolation. The user flow is broken.
 VERDICT: REVISE — user goal NOT delivered despite all WUs "complete"
 ```
 
-**Only proceed to checks 1-7 if this gate passes.**
+**Only proceed to checks 1-5 if this gate passes.** The gate check IS the detailed trace — there is no separate trace step.
 
-### 1. Product Goal Delivery (DETAILED TRACE)
-
-If the gate check passes, now do a detailed trace.
-
-### 2. Cross-Work-Unit Integration
+### 1. Cross-Work-Unit Integration
 
 Individual reviewers see one work unit. You see all of them. Check:
 
@@ -110,7 +106,7 @@ Individual reviewers see one work unit. You see all of them. Check:
 - Config or state that's set up in one WU but read from a different location in another
 - Shared state that's modified by multiple WUs without coordination
 
-### 3. Gap Detection
+### 2. Gap Detection
 
 Specialized reviewers each own one dimension. Find what fell between chairs:
 
@@ -120,7 +116,7 @@ Specialized reviewers each own one dimension. Find what fell between chairs:
 
 Look for these grey zones.
 
-### 4. Evidence Quality Audit
+### 3. Evidence Quality Audit
 
 Read state.json's evidence records. For each AC that claims to be satisfied:
 
@@ -137,18 +133,17 @@ GOOD evidence:
 
 If evidence is weak, flag it. The AC is NOT satisfied just because someone wrote "satisfied" next to it.
 
-### 5. Coherence Check
+### 4. Coherence & Regression
 
-Look at the full diff as one change. Does it read as a single coherent implementation?
+Look at the full diff as one change. Check both coherence and regressions:
 
+**Coherence:**
 - Is the error handling consistent across all WUs? (One uses Result, another throws, a third returns null)
 - Are naming conventions consistent? (One WU calls it "userId", another calls it "user_id", a third calls it "uid")
 - Is the data model consistent? (One WU creates the entity with 5 fields, another reads it expecting 6)
 - Are there competing truth sources? (Two WUs each have their own definition of the same concept)
 
-### 6. Regression Scan
-
-Look at the full diff for obvious regressions that might have slipped through:
+**Regression scan:**
 - Removed error handling that other code depends on
 - Changed a public interface signature without updating all callers
 - Removed a feature that wasn't in any AC but existing users depend on
@@ -156,7 +151,7 @@ Look at the full diff for obvious regressions that might have slipped through:
 
 This is a light scan, not a full review. Trust the specialized reviewers for depth.
 
-### 7. Pre-handoff Enforcement
+### 5. Pre-handoff Enforcement
 
 This is the hygiene gate. The cheap reviewers each look at one axis on one work unit. You look at the whole diff as a reviewer would.
 
@@ -181,7 +176,7 @@ This is the hygiene gate. The cheap reviewers each look at one axis on one work 
 
 **Gate rule: if tests are red, generated files are dirty, or behavior only passes mocks — the work is NOT done. REVISE.**
 
-### 8. Cross-Cutting Principles
+### 6. Cross-Cutting Principles
 
 Quick scan for violations of core principles across the full diff:
 
@@ -201,6 +196,16 @@ If any reviewer should have caught these but didn't, note it — it's a grey zon
 - Individual code clarity (maintainability reviewer did this)
 
 If you find an issue that a specialized reviewer should have caught, note it — it means either the reviewer missed it, or the finding was incorrectly ignored. But don't re-review their domain.
+
+## Scope Constraint
+
+You may NOT block on architecture preferences or design choices that the approved plan explicitly accepted. You may only block when:
+1. The user's original goal is not delivered
+2. The implementation violates the approved plan
+3. AC evidence is fabricated or weak
+4. Integration between WUs is broken
+5. Pre-handoff hygiene fails (dirty diff, mock-only tests)
+6. Cross-cutting principles are violated (unknown, any, swallowed errors)
 
 ## Anti-Laziness Check
 

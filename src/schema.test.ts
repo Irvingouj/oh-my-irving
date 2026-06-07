@@ -20,6 +20,7 @@ function makeValidState(): State {
       blocked_work_units: [],
       ignored_findings: [],
       evidence: [],
+      findings: [],
     },
   };
 }

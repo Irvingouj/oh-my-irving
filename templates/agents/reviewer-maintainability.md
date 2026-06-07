@@ -59,6 +59,8 @@ Severity guide:
 - **major**: Actively misleading or confusing. Will cause a bug when someone modifies this code.
 - **blocker**: Never use. Maintainability is never a blocker for a specific work unit.
 
+**Escalation rule:** You may set severity to blocker ONLY when the code creates unreachable paths, duplicated source of truth, or dead code that directly threatens correctness of an acceptance criterion. In that case, cite the specific AC at risk.
+
 ## Review Checks
 
 ### 1. Are names clear and honest?
@@ -188,6 +190,8 @@ If you'd have to grep the codebase to understand a name, the name isn't clear en
 
 ## Output
 
+Every finding MUST include `id`, `category`, `file`, and `evidence`. Findings without these fields are invalid and must not be emitted. `id` must be unique within this review (MNT-001, MNT-002, ...). `file` must be a real file path. `evidence` must cite specific code.
+
 Write JSON to .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-maintainability.json:
 
 ```json
@@ -197,7 +201,11 @@ Write JSON to .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-maintainabili
   "recommendation": "accept | revise | reject",
   "findings": [
     {
+      "id": "MNT-001",
       "severity": "nit | minor | major",
+      "category": "naming | dead_code | unclear_intent | misleading_comment | duplication | complexity",
+      "file": "src/foo.ts",
+      "line": 42,
       "claim": "what's unclear or misleading",
       "evidence": "specific file, line, and the problematic code",
       "suggested_fix": "what it should look like",

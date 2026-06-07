@@ -319,6 +319,7 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
         objective: tool.schema.string().describe("One sentence goal"),
         criteria: tool.schema.string().describe("Acceptance criteria, one per line: AC-1: description"),
         units: tool.schema.string().describe("Work units, one per line: wu-1: description (depends: wu-0)"),
+        preflight: tool.schema.optional(tool.schema.string()).describe("Preflight commands, comma-separated: build:npm run build,lint:npm run lint,test:npm test"),
       },
       async execute(args, context) {
         requireOrchestratorGraduated(context, "irving_plan");
@@ -340,7 +341,17 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
           return { id: clean.slice(0, colonIdx).trim(), description: clean.slice(colonIdx + 1).trim(), status: "pending", dependencies: deps };
         });
 
-        const plan = { objective: args.objective, acceptance_criteria, work_units };
+        const preflight = args.preflight
+          ? Object.fromEntries(
+              args.preflight.split(",").map(pair => {
+                const idx = pair.indexOf(":");
+                if (idx === -1) return [pair.trim(), ""];
+                return [pair.slice(0, idx).trim(), pair.slice(idx + 1).trim()];
+              }).filter(([_, cmd]) => cmd.length > 0)
+            )
+          : undefined;
+
+        const plan = { objective: args.objective, acceptance_criteria, work_units, ...(preflight && { preflight }) };
         validatePlan(plan);
         await writePlanFile(worktree, sessionId, plan);
         await logEvent(worktree, sessionId, { type: "pipeline.plan_created" });
@@ -394,13 +405,16 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
       description: "Record evidence that an acceptance criterion is satisfied.",
       args: {
         ac_id: tool.schema.string().describe("Acceptance criterion ID like AC-1"),
+        type: tool.schema.string().describe("Evidence type: test, review, manual, or static"),
         detail: tool.schema.string().describe("What was verified and how"),
+        files: tool.schema.optional(tool.schema.string()).describe("Comma-separated file paths referenced by this evidence"),
       },
       async execute(args, context) {
         requireOrchestratorGraduated(context, "irving_evidence");
         const sessionId = await autoSessionId(worktree, context);
         const state = await readStateFile(worktree, sessionId);
-        state.execution.evidence.push({ ac_id: args.ac_id, type: "review", detail: args.detail });
+        const files = args.files ? args.files.split(",").map(f => f.trim()).filter(Boolean) : undefined;
+        state.execution.evidence.push({ ac_id: args.ac_id, type: args.type as "test" | "review" | "manual" | "static", detail: args.detail, files });
         await writeStateFile(worktree, sessionId, state);
         await logEvent(worktree, sessionId, { type: "pipeline.evidence", ac_id: args.ac_id, detail: args.detail });
         return `Evidence recorded for ${args.ac_id}`;
@@ -441,6 +455,63 @@ export function createPipelineTools(worktree: string): Record<string, ToolDefini
         }
         await logEvent(worktree, sessionId, { type: "pipeline.note", kind: args.kind, text: args.text });
         return `Recorded ${args.kind} note`;
+      },
+    }),
+
+    irving_finding: tool({
+      description: "Record a reviewer finding with structured metadata for lifecycle tracking.",
+      args: {
+        finding_id: tool.schema.string().describe("Unique finding ID like SEC-001, CORR-002"),
+        wu_id: tool.schema.string().describe("Work unit ID this finding belongs to"),
+        reviewer: tool.schema.string().describe("Reviewer domain: security, correctness, testing, completeness, architecture, maintainability, typesafe"),
+        severity: tool.schema.string().describe("Severity: blocker, major, minor, or nit"),
+        claim: tool.schema.string().describe("What's wrong"),
+        evidence: tool.schema.string().describe("Specific file, line, and code evidence"),
+        category: tool.schema.optional(tool.schema.string()).describe("Category tag like null_deref, sql_injection, missing_test"),
+        file: tool.schema.optional(tool.schema.string()).describe("File path of the finding"),
+        line: tool.schema.optional(tool.schema.number()).describe("Line number of the finding"),
+      },
+      async execute(args, context) {
+        requireOrchestratorGraduated(context, "irving_finding");
+        const sessionId = await autoSessionId(worktree, context);
+        const state = await readStateFile(worktree, sessionId);
+        state.execution.findings.push({
+          finding_id: args.finding_id,
+          wu_id: args.wu_id,
+          reviewer: args.reviewer,
+          severity: args.severity,
+          claim: args.claim,
+          evidence: args.evidence,
+          status: "open",
+          category: args.category,
+          file: args.file,
+          line: args.line,
+        });
+        await writeStateFile(worktree, sessionId, state);
+        await logEvent(worktree, sessionId, { type: "pipeline.finding", finding_id: args.finding_id, severity: args.severity });
+        return `Recorded finding ${args.finding_id} (${args.severity})`;
+      },
+    }),
+
+    irving_resolve_finding: tool({
+      description: "Resolve a previously recorded finding. Updates status and records resolution evidence.",
+      args: {
+        finding_id: tool.schema.string().describe("The finding ID to resolve"),
+        resolution: tool.schema.string().describe("Resolution: fixed, false_positive, accepted_risk, or duplicate"),
+        evidence: tool.schema.string().describe("What was done or why this resolution applies"),
+      },
+      async execute(args, context) {
+        requireOrchestratorGraduated(context, "irving_resolve_finding");
+        const sessionId = await autoSessionId(worktree, context);
+        const state = await readStateFile(worktree, sessionId);
+        const finding = state.execution.findings.find(f => f.finding_id === args.finding_id);
+        if (!finding) {
+          return `Finding ${args.finding_id} not found`;
+        }
+        finding.status = args.resolution;
+        await writeStateFile(worktree, sessionId, state);
+        await logEvent(worktree, sessionId, { type: "pipeline.resolve_finding", finding_id: args.finding_id, resolution: args.resolution });
+        return `Resolved finding ${args.finding_id} as ${args.resolution}`;
       },
     }),
 

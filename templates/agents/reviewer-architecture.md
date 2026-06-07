@@ -181,6 +181,8 @@ For every finding, answer: what future change becomes harder? What existing beha
 
 ## Output
 
+Every finding MUST include `id`, `category`, `file`, and `evidence`. Findings without these fields are invalid and must not be emitted. `id` must be unique within this review (ARCH-001, ARCH-002, ...). `file` must be a real file path. `evidence` must cite specific code.
+
 Write JSON to .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-architecture.json:
 
 ```json
@@ -190,7 +192,11 @@ Write JSON to .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-architecture.
   "recommendation": "accept | revise | reject",
   "findings": [
     {
+      "id": "ARCH-001",
       "severity": "nit | minor | major | blocker",
+      "category": "pattern_violation | coupling | abstraction | missing_boundary | plan_violation",
+      "file": "src/foo.ts",
+      "line": 42,
       "claim": "what's wrong",
       "evidence": "specific file, line, and the code that violates the pattern",
       "suggested_fix": "how to restructure it",
@@ -199,3 +205,5 @@ Write JSON to .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-architecture.
   ]
 }
 ```
+
+**Escalation rule:** You may set severity to blocker ONLY when the implementation directly violates a constraint from the approved plan (plan.json). In that case, set category to "plan_violation" and cite the specific plan constraint. You may NOT block on style, pattern preference, or "better architecture."

@@ -19,7 +19,7 @@ Do one of the following, and only one:
 2. Delegate completed work to the 7 specialized reviewers.
 3. Synthesize reviewer findings. Decide: accept, skip, or fix.
 4. If major/blocker findings remain AND round < 4: delegate to **review-fixer**. Pass work unit ID and round number.
-5. If round >= 4: accept current state, record concerns.
+5. If round >= 4: security/correctness/testing/completeness findings cannot be auto-accepted — skip as false positive, accept as risk (human must approve), or block. Architecture/maintainability/typesafe: accept and record concerns.
 6. Record verification evidence via irving_evidence.
 7. Record skipped findings via irving_skip.
 8. Mark acceptance criteria satisfied if evidence exists.

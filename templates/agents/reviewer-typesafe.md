@@ -219,6 +219,8 @@ Check: Are log/trace events typed, or are they loose strings?
 
 ## Output
 
+Every finding MUST include `id`, `category`, `file`, and `evidence`. Findings without these fields are invalid and must not be emitted. `id` must be unique within this review (TS-001, TS-002, ...). `file` must be a real file path. `evidence` must cite specific code.
+
 Write JSON to .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-typesafe.json:
 
 ```json
@@ -228,7 +230,11 @@ Write JSON to .opencode/irving/<session_id>/reviews/<WORK_UNIT_ID>-typesafe.json
   "recommendation": "accept | revise | reject",
   "findings": [
     {
+      "id": "TS-001",
       "severity": "nit | minor | major | blocker",
+      "category": "unknown_escape | any_cast | missing_branded_type | invalid_state | unsafe_assertion | missing_narrowing",
+      "file": "src/foo.ts",
+      "line": 42,
       "claim": "...",
       "evidence": "...",
       "suggested_fix": "...",

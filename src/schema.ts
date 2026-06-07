@@ -189,6 +189,30 @@ export function validateState(state: unknown): State {
             ei.detail,
             `state.execution.evidence[${i}].detail`,
           ),
+          files: Array.isArray(ei.files) ? assertArrayOfStrings(ei.files, `state.execution.evidence[${i}].files`) : undefined,
+        };
+      })
+    : [];
+
+  const findings = Array.isArray(execution.findings)
+    ? execution.findings.map((f, i) => {
+        if (f === null || typeof f !== "object") {
+          throw new Error(
+            `Invalid state.execution.findings[${i}]: expected object`,
+          );
+        }
+        const fi = f as Record<string, unknown>;
+        return {
+          finding_id: assertString(fi.finding_id, `state.execution.findings[${i}].finding_id`),
+          wu_id: assertString(fi.wu_id, `state.execution.findings[${i}].wu_id`),
+          reviewer: assertString(fi.reviewer, `state.execution.findings[${i}].reviewer`),
+          severity: assertString(fi.severity, `state.execution.findings[${i}].severity`),
+          claim: assertString(fi.claim, `state.execution.findings[${i}].claim`),
+          evidence: assertString(fi.evidence, `state.execution.findings[${i}].evidence`),
+          status: assertString(fi.status, `state.execution.findings[${i}].status`),
+          category: typeof fi.category === "string" ? fi.category : undefined,
+          file: typeof fi.file === "string" ? fi.file : undefined,
+          line: typeof fi.line === "number" ? fi.line : undefined,
         };
       })
     : [];
@@ -212,6 +236,7 @@ export function validateState(state: unknown): State {
       blocked_work_units,
       ignored_findings,
       evidence,
+      findings,
     },
   };
 }
@@ -256,10 +281,18 @@ export function validatePlan(plan: unknown): Plan {
     validateWorkUnit(wu, `plan.work_units[${i}]`),
   );
 
+  const preflight = (p.preflight === null || p.preflight === undefined || typeof p.preflight !== "object")
+    ? undefined
+    : Object.fromEntries(
+        Object.entries(p.preflight as Record<string, unknown>)
+          .filter(([_, v]) => typeof v === "string")
+      );
+
   return {
     objective,
     acceptance_criteria,
     work_units,
+    ...(preflight && Object.keys(preflight).length > 0 && { preflight: preflight as Record<string, string> }),
   };
 }
 

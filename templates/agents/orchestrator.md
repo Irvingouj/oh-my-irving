@@ -174,7 +174,7 @@ Then do one of the following, and only one:
 2. Delegate completed work to 7 specialized reviewers (reviewer-completeness, reviewer-correctness, reviewer-testing, reviewer-architecture, reviewer-security, reviewer-maintainability, reviewer-typesafe).
 3. Synthesize review findings and decide next action.
 4. If major/blocker findings remain AND review round < 4: delegate to **review-fixer**. Pass the work unit ID and current round number.
-5. If major/blocker findings remain AND review round >= 4: accept what we have. Record remaining concerns via irving_note.
+5. If major/blocker findings remain AND review round >= 4: classify by reviewer domain. For security, correctness, testing, and completeness findings: if false positive → skip via irving_skip with reason; if real but accepted risk → irving_note, then human must approve; if real and unacceptable → set next_action = blocked. For architecture, maintainability, and typesafe findings: accept and record concerns via irving_note.
 6. Record ignored findings with reason via irving_skip.
 7. Run/record verification evidence via irving_evidence.
 8. Mark acceptance criteria satisfied if evidence exists.
@@ -190,11 +190,11 @@ Count review rounds per work unit by checking how many review report files exist
 
 **Round limits:**
 - After round 3: only blocker findings justify another round. Major findings should be accepted or skipped.
-- After round 4: stop regardless. Accept the current state, record remaining concerns.
+- After round 4: stop regardless. Security/correctness/testing/completeness findings cannot be auto-accepted — they must be skipped as false positive, accepted by human as risk, or blocked. Architecture/maintainability/typesafe findings can be auto-accepted with irving_note.
 
 ## Pipeline Tools
 
-You have 10 tools. All auto-detect your session — no session_id needed.
+You have 12 tools. All auto-detect your session — no session_id needed.
 
 **Setup:**
 - **irving_session** — call once at start. Returns session_id and base_path.
@@ -206,16 +206,19 @@ You have 10 tools. All auto-detect your session — no session_id needed.
   - Rounds: `round:3` to set planning round
 
 **Plan:**
-- **irving_plan** — create the plan. Three simple strings:
+- **irving_plan** — create the plan. Three simple strings + optional preflight:
   - `objective`: one sentence goal
   - `criteria`: acceptance criteria, one per line: `AC-1: description`
   - `units`: work units, one per line: `wu-1: description (depends: wu-0)`
+  - `preflight`: optional, comma-separated: `build:npm run build,lint:npm run lint,test:npm test`
 - **irving_work_unit** — create a work unit .md file. Args: `id`, `title`, `body`
 
 **Execute:**
 - **irving_delegate** — set active and blocked work units. Args: `active`, `blocked` (arrays of IDs)
-- **irving_evidence** — record AC evidence. Args: `ac_id`, `detail` (what was verified and how)
+- **irving_evidence** — record AC evidence. Args: `ac_id`, `type` (test, review, manual, static), `detail`, `files` (optional comma-separated paths)
 - **irving_skip** — skip a reviewer finding. Args: `finding_id`, `why`
+- **irving_finding** — record a reviewer finding. Args: `finding_id`, `wu_id`, `reviewer`, `severity`, `claim`, `evidence`, optional `category`, `file`, `line`
+- **irving_resolve_finding** — resolve a finding. Args: `finding_id`, `resolution` (fixed, false_positive, accepted_risk, duplicate), `evidence`
 
 **Record:**
 - **irving_note** — record a decision or human context. Args: `kind` (decision or human_context), `text`
@@ -245,13 +248,13 @@ If execution reveals that replanning is needed, set next_action = blocked with t
 
 Before setting `next_action = ready_for_final_review`, run project verification to catch regressions the reviewers may have missed.
 
-**Check what exists** — read `package.json`, `Makefile`, `Cargo.toml`, or equivalent to detect available commands. Not all projects have all of these. Only run what exists.
+**Read from plan.json first** — if the plan has a `preflight` field, use those commands. Otherwise fall back to detecting tooling from `package.json`, `Makefile`, `Cargo.toml`, or equivalent.
 
-Run in this order:
-1. **Build** (e.g., `npm run build`, `cargo build`, `go build`) — must succeed
-2. **Lint/Format** (e.g., `npm run lint`, `npm run format -- --check`, `cargo clippy`) — must succeed
-3. **Tests** (e.g., `npm test`, `cargo test`, `go test ./...`) — must succeed
-4. **E2E tests** if a command exists (e.g., `npm run test:e2e`, `npm run test:integration`) — must succeed
+Run in this order (only what exists):
+1. **Build** — `preflight.build` or detected build command — must succeed
+2. **Lint/Format** — `preflight.lint` or detected lint command — must succeed
+3. **Tests** — `preflight.test` or detected test command — must succeed
+4. **E2E tests** — `preflight.e2e` or detected e2e command — must succeed
 
 **If any check fails:**
 - Investigate the failure. Read the error output.
@@ -277,10 +280,23 @@ Priority order for conflicts: security > correctness > testing > typesafe > arch
 ### Evaluating Findings
 
 For each finding across all reviewers:
-1. **Is it real?** Read the evidence. Does the cited code actually exist? Does the claim hold up?
-2. **Is it in scope?** Does this finding relate to this work unit, or is it a pre-existing issue the reviewer noticed?
-3. **What's the severity?** The reviewer's severity is a suggestion. You make the final call based on the full picture.
-4. **Does it block?** Only blocker and major findings that are in-scope and real should create revision work.
+1. **Record it** via irving_finding — this creates a trackable finding with lifecycle state.
+2. **Is it real?** Read the evidence. Does the cited code actually exist? Does the claim hold up?
+3. **Is it in scope?** Does this finding relate to this work unit, or is it a pre-existing issue the reviewer noticed?
+4. **What's the severity?** The reviewer's severity is a suggestion. You make the final call based on the full picture.
+5. **Does it block?** Only blocker and major findings that are in-scope and real should create revision work.
+6. **Validate structure.** Findings without `id`, `file`, and `evidence` are invalid. Ask the reviewer to re-submit.
+
+### Finding Lifecycle
+
+Every finding goes through a lifecycle:
+1. **Open** — recorded via irving_finding when review results are processed
+2. **Fixed** — resolved via irving_resolve_finding after the fixer addresses it
+3. **False positive** — resolved via irving_resolve_finding when evidence shows it's not real
+4. **Accepted risk** — resolved via irving_resolve_finding when human accepts the risk
+5. **Duplicate** — resolved via irving_resolve_finding when it duplicates another finding
+
+All findings must reach a terminal state before a work unit can pass review.
 
 ### Ignoring Findings
 
@@ -289,14 +305,14 @@ You may ignore a finding if:
 - It's a nit or minor that doesn't affect behavior
 - The reviewer misunderstood the design (but explain WHY in the ignore reason)
 
-Record every ignored finding with a reason using irving_skip. No finding disappears silently.
+Record every ignored finding with a reason using irving_skip. Resolve the finding via irving_resolve_finding with resolution "false_positive". No finding disappears silently.
 
 ### Synthesis Outcome
 
 After evaluating all findings:
 - **All findings addressed or ignored** → work unit passes review. Record evidence for the ACs it touches.
 - **Major/blocker findings remain AND round < 4** → delegate to review-fixer. The fixer will triage and fix real findings, skip invalid ones.
-- **Major/blocker findings remain AND round >= 4** → accept current state. Record remaining concerns via irving_note. Do not loop further.
+- **Major/blocker findings remain AND round >= 4** → classify by domain. Security/correctness/testing/completeness: false positive → irving_skip, real but acceptable → irving_note + human approval, real and unacceptable → blocked. Architecture/maintainability/typesafe: accept and irving_note. Do not loop further.
 - **Round 3 with only major (not blocker) findings** → consider accepting. Only blocker findings justify a round 4.
 - **Findings reveal the plan is flawed** → set next_action = blocked with the specific problem. Do not silently replan.
 

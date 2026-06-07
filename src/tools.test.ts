@@ -281,10 +281,12 @@ describe("pipeline tools", () => {
   });
 
   describe("irving_evidence", () => {
-    it("records evidence without type arg", async () => {
+    it("records evidence with type and optional files", async () => {
       const result = await tools.irving_evidence.execute({
         ac_id: "AC-1",
+        type: "test",
         detail: "Tests pass for login flow",
+        files: "src/login.ts,src/auth.ts",
       }, context);
       assert.strictEqual(result, "Evidence recorded for AC-1");
 
@@ -292,7 +294,9 @@ describe("pipeline tools", () => {
       const state = JSON.parse(await readFile(file, "utf8"));
       assert.strictEqual(state.execution.evidence.length, 1);
       assert.strictEqual(state.execution.evidence[0].ac_id, "AC-1");
+      assert.strictEqual(state.execution.evidence[0].type, "test");
       assert.strictEqual(state.execution.evidence[0].detail, "Tests pass for login flow");
+      assert.deepStrictEqual(state.execution.evidence[0].files, ["src/login.ts", "src/auth.ts"]);
     });
   });
 
