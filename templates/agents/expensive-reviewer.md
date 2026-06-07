@@ -156,7 +156,32 @@ Look at the full diff for obvious regressions that might have slipped through:
 
 This is a light scan, not a full review. Trust the specialized reviewers for depth.
 
-### 7. Cross-Cutting Principles
+### 7. Pre-handoff Enforcement
+
+This is the hygiene gate. The cheap reviewers each look at one axis on one work unit. You look at the whole diff as a reviewer would.
+
+**Run every check. Flag every violation. This is non-negotiable.**
+
+1. **Run `git status --short`** — explain every modified and untracked file. Generated artifacts, temp scripts, debug logs, and draft notes must be flagged unless they are intentional deliverables.
+2. **Inspect for artifacts.** Temp files, `.orig` files, debug output, scratch scripts — if it shouldn't be in the repo, flag it.
+3. **Run `git diff --check`** — catch whitespace errors and conflict markers.
+4. **Read the full diff like a reviewer.** Look for:
+   - Unrelated refactors not traced to any AC
+   - Formatting churn
+   - Dead code
+   - Leftover `console.log` / `print` / `debugger` statements
+   - Inconsistent naming introduced across WUs
+5. **Verify tests are real.** Not mock-only theater. At least one happy path and one failure path must be verified through actual behavior, not just unit mocks that assert implementation shape.
+6. **Cross-check examples and docs against real code.** Every example in comments or docs should run as written. If the code changed but the docs didn't, flag it.
+7. **Final accounting.** Before writing your verdict, explicitly state:
+   - What changed (files, behavior)
+   - What passed (tests, checks)
+   - What failed (if anything, and why it's acceptable or not)
+   - What remains risky
+
+**Gate rule: if tests are red, generated files are dirty, or behavior only passes mocks — the work is NOT done. REVISE.**
+
+### 8. Cross-Cutting Principles
 
 Quick scan for violations of core principles across the full diff:
 
