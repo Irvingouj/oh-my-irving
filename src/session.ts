@@ -198,9 +198,6 @@ export async function assertSessionConsistent(worktree: string, sessionID: strin
     throw new Error(`Invalid Irving session anchor at ${file}: missing root_session_id.`);
   }
   const childSessionIds = anchor.child_session_ids ?? [];
-  if (sessionID !== rootSessionId && !childSessionIds.includes(sessionID)) {
-    childSessionIds.push(sessionID);
-  }
 
   await writeFile(
     file,
@@ -217,4 +214,45 @@ export async function assertSessionConsistent(worktree: string, sessionID: strin
     ) + "\n",
     "utf8",
   );
+}
+
+export async function registerChildSession(
+  worktree: string,
+  parentSessionID: string,
+  childSessionID: string,
+) {
+  if (!parentSessionID || !childSessionID || parentSessionID === childSessionID) return false;
+
+  const file = sessionAnchorPath(worktree);
+  if (!existsSync(file)) return false;
+
+  const anchor = JSON.parse(await readFile(file, "utf8")) as SessionAnchor;
+  const rootSessionId = anchor.root_session_id || anchor.session_id;
+  if (!rootSessionId) {
+    throw new Error(`Invalid Irving session anchor at ${file}: missing root_session_id.`);
+  }
+
+  const childSessionIds = anchor.child_session_ids ?? [];
+  const parentBelongsToRoot = parentSessionID === rootSessionId || childSessionIds.includes(parentSessionID);
+  if (!parentBelongsToRoot) return false;
+  if (childSessionIds.includes(childSessionID)) return true;
+
+  const now = new Date().toISOString();
+  childSessionIds.push(childSessionID);
+  await writeFile(
+    file,
+    JSON.stringify(
+      {
+        version: 1,
+        root_session_id: rootSessionId,
+        child_session_ids: childSessionIds,
+        created_at: anchor.created_at ?? now,
+        updated_at: now,
+      },
+      null,
+      2,
+    ) + "\n",
+    "utf8",
+  );
+  return true;
 }

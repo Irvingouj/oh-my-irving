@@ -294,6 +294,54 @@ describe("createGuardHooks", () => {
       );
     });
 
+    it("blocks repeated alternating tool sequences with graduated prompts", async () => {
+      const readA = { filePath: "crates/extension-js/js/src/main/runner/tools/chrome/chrome-storage.ts" };
+      const readB = { filePath: "crates/extension-js/js/src/main/runner/tools/chrome/tts.ts" };
+
+      await hooks["tool.execute.before"](
+        { tool: "read", sessionID: "ses-1", callID: "call-0" },
+        { args: readA },
+      );
+      await hooks["tool.execute.before"](
+        { tool: "read", sessionID: "ses-1", callID: "call-1" },
+        { args: readB },
+      );
+      await hooks["tool.execute.before"](
+        { tool: "read", sessionID: "ses-1", callID: "call-2" },
+        { args: readA },
+      );
+      await hooks["tool.execute.before"](
+        { tool: "read", sessionID: "ses-1", callID: "call-3" },
+        { args: readB },
+      );
+      await hooks["tool.execute.before"](
+        { tool: "read", sessionID: "ses-1", callID: "call-4" },
+        { args: readA },
+      );
+
+      await assert.rejects(
+        async () => await hooks["tool.execute.before"](
+          { tool: "read", sessionID: "ses-1", callID: "call-5" },
+          { args: readB },
+        ),
+        /repeated 3 times[\s\S]*YOU MUST REPLY WITH HUMAN LANGUAGE, NO JSON, IMMEDIATELY[\s\S]*Sorry I stucked in a loop/,
+      );
+      try {
+        await hooks["tool.execute.before"](
+          { tool: "read", sessionID: "ses-1", callID: "call-6" },
+          { args: readA },
+        );
+      } catch {}
+
+      await assert.rejects(
+        async () => await hooks["tool.execute.before"](
+          { tool: "read", sessionID: "ses-1", callID: "call-7" },
+          { args: readB },
+        ),
+        /now repeated 4 times[\s\S]*YOU MUST REPLY WITH HUMAN LANGUAGE, NO JSON, IMMEDIATELY[\s\S]*Sorry I stucked in a loop/,
+      );
+    });
+
     describe("human reply gate", () => {
       it("blocks irving_next(accepted) without human reply", async () => {
         await assert.rejects(

@@ -4,6 +4,7 @@ import path from "node:path";
 import {
   sessionAnchorPath,
   assertSessionConsistent,
+  registerChildSession,
   ensureDirs,
   logsDir,
   debateDir,
@@ -36,6 +37,30 @@ const SAME_TOOL_LIMIT = 20;
 const SAME_TOOL_WHITELIST = new Set(["bash", "read", "write", "edit", "glob", "grep", "list"]);
 
 type ToolCall = { tool: string; argsHash: string };
+
+type OpenCodeEvent = {
+  type: string;
+  session_id?: string;
+  sessionID?: string;
+  properties?: {
+    sessionID?: string;
+    info?: {
+      parentID?: string;
+    };
+  };
+  [key: string]: unknown;
+};
+
+function eventSessionID(event: OpenCodeEvent): string | undefined {
+  return event.session_id || event.sessionID || event.properties?.sessionID || event.properties?.info?.parentID;
+}
+
+function eventChildSession(event: OpenCodeEvent): { parentID: string; childID: string } | null {
+  const childID = event.session_id || event.sessionID || event.properties?.sessionID;
+  const parentID = event.properties?.info?.parentID;
+  if (!parentID || !childID) return null;
+  return { parentID, childID };
+}
 
 function stableStringify(value: unknown): string {
   const seen = new WeakSet<object>();
@@ -112,6 +137,74 @@ const SAME_TOOL_MESSAGES = [
     ].join("\n"),
 ];
 
+const REPEATED_SEQUENCE_MESSAGES = [
+  (sequence: string, repeats: number) =>
+    [
+      `[anti-loop] You are repeating the same tool sequence. The last sequence has repeated ${repeats} times.`,
+      "",
+      `Sequence: ${sequence}`,
+      "",
+      "This is probably a loop, not progress.",
+      "YOU MUST REPLY WITH HUMAN LANGUAGE, NO JSON, IMMEDIATELY. REPLY WITH: \"Sorry I stucked in a loop. I was repeating the same tool sequence instead of making progress.\"",
+    ].join("\n"),
+  (sequence: string, repeats: number) =>
+    [
+      `[anti-loop] Same sequence again. That pattern has now repeated ${repeats} times.`,
+      "",
+      `Sequence: ${sequence}`,
+      "",
+      "The statistical signal is stronger now: you are cycling between the same calls.",
+      "YOU MUST REPLY WITH HUMAN LANGUAGE, NO JSON, IMMEDIATELY. REPLY WITH: \"Sorry I stucked in a loop. I repeated the same sequence again and need to stop using tools.\"",
+    ].join("\n"),
+  (sequence: string, repeats: number) =>
+    [
+      `[anti-loop] Repeated sequence detected ${repeats} times. You are stuck in a tool-call cycle.`,
+      "",
+      `Sequence: ${sequence}`,
+      "",
+      "Do not keep sampling the same files or commands.",
+      "YOU MUST REPLY WITH HUMAN LANGUAGE, NO JSON, IMMEDIATELY. REPLY WITH: \"Sorry I stucked in a loop. I am stuck in a repeated tool-call cycle and need your direction.\"",
+    ].join("\n"),
+];
+
+function toolCallSignature(call: ToolCall): string {
+  return `${call.tool}\0${call.argsHash}`;
+}
+
+type RepeatedSequence = { sequence: ToolCall[]; repeats: number };
+
+function repeatedSequenceAtTail(calls: ToolCall[], minRepeats = 3): RepeatedSequence | null {
+  const maxPatternLength = Math.min(6, Math.floor(calls.length / minRepeats));
+  const signatures = calls.map(toolCallSignature);
+
+  for (let patternLength = 2; patternLength <= maxPatternLength; patternLength++) {
+    const tailStart = calls.length - patternLength;
+    const pattern = signatures.slice(tailStart);
+
+    let repeats = 1;
+    for (let offset = tailStart - patternLength; offset >= 0; offset -= patternLength) {
+      const candidate = signatures.slice(offset, offset + patternLength);
+      if (candidate.length !== patternLength || candidate.some((value, index) => value !== pattern[index])) break;
+      repeats++;
+    }
+
+    if (repeats >= minRepeats) {
+      return { sequence: calls.slice(tailStart, tailStart + patternLength), repeats };
+    }
+  }
+
+  return null;
+}
+
+function summarizeSequence(sequence: ToolCall[]): string {
+  return sequence
+    .map((call) => {
+      const args = call.argsHash.length > 180 ? call.argsHash.slice(0, 180) + "..." : call.argsHash;
+      return `${call.tool} ${args}`;
+    })
+    .join(" -> ");
+}
+
 function checkAntiLoop(recent: ToolCall[], tool: string, args: Record<string, unknown>): void {
   const argsHash = stableStringify(args);
 
@@ -143,6 +236,16 @@ function checkAntiLoop(recent: ToolCall[], tool: string, args: Record<string, un
     const msgFn = SAME_TOOL_MESSAGES[msgIdx];
     throw new Error(msgFn(tool, sameToolRun + 1));
   }
+
+  const repeatedSequence = repeatedSequenceAtTail([...recent, { tool, argsHash }]);
+  if (repeatedSequence) {
+    const msgIdx = Math.min(
+      repeatedSequence.repeats - 3,
+      REPEATED_SEQUENCE_MESSAGES.length - 1,
+    );
+    const msgFn = REPEATED_SEQUENCE_MESSAGES[msgIdx];
+    throw new Error(msgFn(summarizeSequence(repeatedSequence.sequence), repeatedSequence.repeats));
+  }
 }
 
 const AWAITING_HUMAN_MESSAGE = [
@@ -171,11 +274,13 @@ export function createGuardHooks(worktree: string) {
   const CRITICAL_PHASES = new Set(["accepted", "final_review"]);
 
   return {
-    event: async ({ event }: { event: { type: string;[key: string]: unknown } }) => {
-      const sessionId = await resolveGuardSessionId(
-        worktree,
-        (event.session_id as string) || (event.sessionID as string),
-      );
+    event: async ({ event }: { event: OpenCodeEvent }) => {
+      const childSession = event.type === "session.created" ? eventChildSession(event) : null;
+      if (childSession) {
+        await registerChildSession(worktree, childSession.parentID, childSession.childID);
+      }
+
+      const sessionId = await resolveGuardSessionId(worktree, eventSessionID(event));
       if (!sessionId) return;
 
       if (

@@ -20,6 +20,7 @@ import {
   ensureDirs,
   currentSessionId,
   assertSessionConsistent,
+  registerChildSession,
 } from "./session.js";
 
 describe("session path helpers", () => {
@@ -122,6 +123,19 @@ describe("currentSessionId", () => {
     assert.strictEqual(result, "ctx-1");
   });
 
+  it("replaces existing anchor for a new top-level context session", async () => {
+    const context = { sessionID: "old-root" } as ToolContext;
+    await currentSessionId(tmpDir, context);
+
+    const context2 = { sessionID: "new-root" } as ToolContext;
+    const result = await currentSessionId(tmpDir, context2);
+
+    assert.strictEqual(result, "new-root");
+    const anchor = JSON.parse(await readFile(sessionAnchorPath(tmpDir), "utf8"));
+    assert.strictEqual(anchor.root_session_id, "new-root");
+    assert.deepStrictEqual(anchor.child_session_ids, []);
+  });
+
   it("throws when requested session id mismatches existing anchor", async () => {
     const context = { sessionID: "ctx-1" } as ToolContext;
     await currentSessionId(tmpDir, context);
@@ -160,10 +174,20 @@ describe("assertSessionConsistent", () => {
     assert.strictEqual(anchor.root_session_id, "ses-1");
   });
 
-  it("adds child session to existing anchor", async () => {
+  it("does not add unknown sessions as children from tool hooks", async () => {
     await assertSessionConsistent(tmpDir, "root-ses");
     await assertSessionConsistent(tmpDir, "child-ses");
     const anchor = JSON.parse(await readFile(sessionAnchorPath(tmpDir), "utf8"));
+    assert.strictEqual(anchor.root_session_id, "root-ses");
+    assert.deepStrictEqual(anchor.child_session_ids, []);
+  });
+
+  it("registers child session only when parent relationship is explicit", async () => {
+    await assertSessionConsistent(tmpDir, "root-ses");
+    const registered = await registerChildSession(tmpDir, "root-ses", "child-ses");
+
+    const anchor = JSON.parse(await readFile(sessionAnchorPath(tmpDir), "utf8"));
+    assert.strictEqual(registered, true);
     assert.strictEqual(anchor.root_session_id, "root-ses");
     assert.deepStrictEqual(anchor.child_session_ids, ["child-ses"]);
   });

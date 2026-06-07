@@ -4,6 +4,11 @@ mode: primary
 temperature: 0.15
 permission:
   edit: allow
+  external_directory:
+    "*": deny
+    "/tmp/**": allow
+    "/private/tmp/**": allow
+    "/var/tmp/**": allow
   bash:
     "git rebase*": deny
     "git push --force*": deny
