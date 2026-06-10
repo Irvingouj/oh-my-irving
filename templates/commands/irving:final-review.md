@@ -13,12 +13,22 @@ The expensive-reviewer writes its output to <base_path>/reviews/final-review.md.
 After expensive review:
 
 If final reviewer says ACCEPT:
-- set next_action = blocked
-- ask human for final approval
+- Enter the review loop:
+  - Run /fire-reviewer
+  - If no problems found: break the loop
+  - If problems found: run /fire-fixer, then repeat the loop
+- Once the loop exits clean:
+  - set next_action = blocked
+  - ask human for final approval
 
 If final reviewer says REVISE:
-- convert findings into new work units
-- set next_action = continue
+- Enter the review loop:
+  - Run /fire-reviewer
+  - If no problems found: break the loop
+  - If problems found: run /fire-fixer, then repeat the loop
+- Once the loop exits clean:
+  - convert any remaining findings into new work units
+  - set next_action = continue
 
 If final reviewer says REJECT:
 - set next_action = blocked
